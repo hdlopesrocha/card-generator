@@ -194,6 +194,7 @@ const MIN_ACTION_FONT_SIZE = 4.5
 const GRADIENT_BANDS = 40
 const BEZIER_CIRCLE = 0.5522847498307936
 const CARD_BOTTOM_COLOR = '#05070d'
+const CARD_SURFACE_COLOR = '#ffffff'
 
 /**
  * Sum of every vertical section at full scale. Used to compute the global
@@ -819,18 +820,31 @@ function drawCardBackground(ctx: CardRenderContext, theme: ZoneTheme): void {
   const { width, height } = ctx
   const bottomColor = parseColor(CARD_BOTTOM_COLOR).color
 
-  // Full-bleed background: the page is exactly the card size, so the design
-  // covers it edge to edge with no page margins or rounded outer corners.
-  drawLocalRect(ctx, { x: 0, y: 0, width, height }, bottomColor, 1)
+  // White card stock: the printed card is white with a coloured inner frame.
+  drawLocalRect(ctx, { x: 0, y: 0, width, height }, parseColor(CARD_SURFACE_COLOR).color, 1)
+
+  const inset = LAYOUT.frameInset * width
+  const radius = LAYOUT.frameRadius * width
+  const frame: Box = {
+    x: inset,
+    y: inset,
+    width: width - inset * 2,
+    height: height - inset * 2,
+  }
+
+  const pdfFrame = toPdfBox(ctx, frame)
+  pushRoundedRectClip(ctx.page, pdfFrame.x, pdfFrame.y, pdfFrame.width, pdfFrame.height, radius)
+
+  drawLocalRect(ctx, frame, bottomColor, 1)
 
   const from = parseColor(theme.gradientFrom).color
-  const bandHeight = height / GRADIENT_BANDS
+  const bandHeight = frame.height / GRADIENT_BANDS
   for (let index = 0; index < GRADIENT_BANDS; index += 1) {
     const t = index / (GRADIENT_BANDS - 1)
-    const bandTop = index * bandHeight
+    const bandTop = frame.y + index * bandHeight
     drawLocalRect(
       ctx,
-      { x: 0, y: bandTop - 0.25, width, height: bandHeight + 0.5 },
+      { x: frame.x, y: bandTop - 0.25, width: frame.width, height: bandHeight + 0.5 },
       mixColors(from, bottomColor, t),
       1,
     )
@@ -839,9 +853,39 @@ function drawCardBackground(ctx: CardRenderContext, theme: ZoneTheme): void {
   // Subtle top glow plus the soft zone halo behind the artwork.
   const primary = parseColor(theme.primary).color
   const primaryDark = parseColor(theme.primaryDark).color
-  drawRadialGlow(ctx, width / 2, -0.06 * height, 0.62 * width, 0.34 * height, primary, 6, 0.055)
-  drawRadialGlow(ctx, width / 2, 0.28 * height, 0.55 * width, 0.26 * height, primary, 5, 0.045)
-  drawRadialGlow(ctx, width / 2, 1.02 * height, 0.95 * width, 0.38 * height, primaryDark, 5, 0.05)
+  const centerX = frame.x + frame.width / 2
+  drawRadialGlow(
+    ctx,
+    centerX,
+    frame.y - 0.06 * frame.height,
+    0.62 * frame.width,
+    0.34 * frame.height,
+    primary,
+    6,
+    0.055,
+  )
+  drawRadialGlow(
+    ctx,
+    centerX,
+    frame.y + 0.28 * frame.height,
+    0.55 * frame.width,
+    0.26 * frame.height,
+    primary,
+    5,
+    0.045,
+  )
+  drawRadialGlow(
+    ctx,
+    centerX,
+    frame.y + 1.02 * frame.height,
+    0.95 * frame.width,
+    0.38 * frame.height,
+    primaryDark,
+    5,
+    0.05,
+  )
+
+  popClip(ctx.page)
 }
 
 function drawRadialGlow(

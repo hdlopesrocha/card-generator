@@ -6,6 +6,7 @@ import { getCardTextLabels, getZoneLabel } from '@/config/languages'
 import { getZoneTheme } from '@/config/zones'
 import { getLocalizedCard } from '@/services/localization/cardLocalization'
 import { useLanguageStore } from '@/stores/languageStore'
+import { useSettingsStore } from '@/stores/settingsStore'
 import CardImage from '@/components/CardImage.vue'
 import CardStats from '@/components/CardStats.vue'
 import CardZoneBadge from '@/components/CardZoneBadge.vue'
@@ -14,17 +15,16 @@ const props = withDefaults(
   defineProps<{
     card: Card
     widthPx?: number
-    aspectRatio?: string
     compact?: boolean
   }>(),
   {
     widthPx: 380,
-    aspectRatio: '63 / 88',
     compact: false,
   },
 )
 
 const languageStore = useLanguageStore()
+const settings = useSettingsStore()
 
 const displayCard = computed(() => getLocalizedCard(props.card, languageStore.language))
 
@@ -44,7 +44,8 @@ const rootStyle = computed(
   () =>
     ({
       width: `min(${props.widthPx}px, 100%)`,
-      '--card-aspect': props.aspectRatio,
+      // Always match the physical dimensions configured for the PDF.
+      '--card-aspect': settings.cardAspectRatio,
     }) as CSSProperties,
 )
 </script>
@@ -62,9 +63,9 @@ const rootStyle = computed(
       })
     "
   >
-    <div class="card__texture" aria-hidden="true" />
-
     <div class="card__frame">
+      <div class="card__texture" aria-hidden="true" />
+
       <header class="card__header">
         <div class="card__heading">
           <h3 class="card__title">{{ displayCard.title || labels.untitled }}</h3>

@@ -7,7 +7,6 @@ import { getZoneTheme } from '@/config/zones'
 import type { Card } from '@/models/Card'
 import { hasTranslation } from '@/services/localization/cardLocalization'
 import { useLanguageStore } from '@/stores/languageStore'
-import { useSettingsStore } from '@/stores/settingsStore'
 
 const props = defineProps<{
   card: Card
@@ -21,7 +20,6 @@ const emit = defineEmits<{
 }>()
 
 const languageStore = useLanguageStore()
-const settings = useSettingsStore()
 
 const labels = computed(() => getCardTextLabels(languageStore.language))
 
@@ -46,7 +44,6 @@ const fallbackLabel = computed(() =>
       <CardPreview
         :card="card"
         :width-px="320"
-        :aspect-ratio="settings.cardAspectRatio"
       />
     </div>
 

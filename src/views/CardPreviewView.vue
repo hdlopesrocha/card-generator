@@ -146,7 +146,6 @@ async function handlePdf(): Promise<void> {
             <CardPreview
               :card="card"
               :width-px="430"
-              :aspect-ratio="settings.cardAspectRatio"
             />
           </div>
         </div>

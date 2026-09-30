@@ -62,14 +62,8 @@
   isolation: isolate;
   overflow: hidden;
   aspect-ratio: var(--card-aspect, 63 / 88);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background:
-    radial-gradient(
-      120% 70% at 50% -10%,
-      color-mix(in srgb, var(--zone-color) 38%, transparent) 0%,
-      transparent 62%
-    ),
-    linear-gradient(178deg, var(--zone-color-deep) 0%, #05070d 78%);
+  border: 1px solid rgba(2, 6, 18, 0.14);
+  background: #ffffff;
   box-shadow: var(--card-shadow);
   container-type: inline-size;
   color: var(--zone-color-ink);
@@ -77,40 +71,11 @@
   user-select: none;
 }
 
-/* Soft zone glow behind the artwork. */
-.card::before {
-  content: '';
-  position: absolute;
-  z-index: 0;
-  inset: 12% 6% 46% 6%;
-  background: radial-gradient(
-    60% 60% at 50% 35%,
-    color-mix(in srgb, var(--zone-color) 45%, transparent) 0%,
-    transparent 72%
-  );
-  filter: blur(1.4cqw);
-  opacity: 0.75;
-  pointer-events: none;
-}
-
-/* Bottom vignette for depth. */
-.card::after {
-  content: '';
-  position: absolute;
-  z-index: 0;
-  inset: 0;
-  background: radial-gradient(
-    130% 60% at 50% 118%,
-    color-mix(in srgb, var(--zone-color-dark) 55%, transparent) 0%,
-    transparent 70%
-  );
-  pointer-events: none;
-}
-
 .card__texture {
   position: absolute;
-  z-index: 1;
+  z-index: 0;
   inset: 0;
+  border-radius: inherit;
   opacity: 0.55;
   pointer-events: none;
   mix-blend-mode: soft-light;
@@ -144,25 +109,45 @@
 }
 
 /* ------------------------------------------------------------------ */
-/* Inner frame with content                                           */
+/* Inner frame: carries the zone colours on a white card stock          */
 /* ------------------------------------------------------------------ */
 
 .card__frame {
   position: absolute;
-  z-index: 2;
+  z-index: 1;
   inset: 2.4cqw;
   display: flex;
   flex-direction: column;
   gap: 2.4cqw;
   padding: 3.4cqw;
-  border: 1px solid var(--card-frame, rgba(255, 255, 255, 0.16));
+  border: 1px solid color-mix(in srgb, var(--zone-color-light) 38%, transparent);
   border-radius: 2.8cqw;
-  background: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.04) 0%,
-    rgba(0, 0, 0, 0.12) 100%
-  );
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.25);
+  background:
+    radial-gradient(
+      120% 70% at 50% -10%,
+      color-mix(in srgb, var(--zone-color) 40%, transparent) 0%,
+      transparent 62%
+    ),
+    radial-gradient(
+      130% 60% at 50% 118%,
+      color-mix(in srgb, var(--zone-color-dark) 55%, transparent) 0%,
+      transparent 70%
+    ),
+    linear-gradient(178deg, var(--zone-color-deep) 0%, #05070d 78%);
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.25),
+    0 0.8cqw 2.4cqw rgba(2, 6, 18, 0.35);
+}
+
+/* Keep the content above the decorative texture. */
+.card__frame > * {
+  position: relative;
+  z-index: 1;
+}
+
+.card__frame > .card__texture {
+  position: absolute;
+  z-index: 0;
 }
 
 /* Accent corner ticks. */
