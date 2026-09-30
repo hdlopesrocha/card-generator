@@ -1,0 +1,488 @@
+/**
+ * Card visual design (web preview).
+ *
+ * The card is sized by its container width and uses container query units
+ * (`cqw`) for every measurement, so the exact same proportions appear in
+ * the editor preview, the full preview page and (mirrored in millimetres by
+ * the PDF renderer) the printed output.
+ */
+
+/* ------------------------------------------------------------------ */
+/* Zone palettes: one class per zone sets the current-zone variables.  */
+/* ------------------------------------------------------------------ */
+
+.zone-attack {
+  --zone-color: var(--zone-attack);
+  --zone-color-dark: var(--zone-attack-dark);
+  --zone-color-deep: var(--zone-attack-deep);
+  --zone-color-light: var(--zone-attack-light);
+  --zone-color-accent: var(--zone-attack-accent);
+  --zone-color-ink: #fdf3e7;
+  --zone-color-ink-muted: #e9c7b4;
+  --zone-color-panel: rgba(224, 53, 43, 0.16);
+  --zone-color-panel-border: rgba(255, 122, 107, 0.38);
+  --zone-color-badge-bg: rgba(255, 181, 69, 0.18);
+  --zone-color-badge-text: #ffdca8;
+}
+
+.zone-midfield {
+  --zone-color: var(--zone-midfield);
+  --zone-color-dark: var(--zone-midfield-dark);
+  --zone-color-deep: var(--zone-midfield-deep);
+  --zone-color-light: var(--zone-midfield-light);
+  --zone-color-accent: var(--zone-midfield-accent);
+  --zone-color-ink: #f0fdf4;
+  --zone-color-ink-muted: #b9e6c8;
+  --zone-color-panel: rgba(22, 163, 74, 0.16);
+  --zone-color-panel-border: rgba(94, 233, 147, 0.34);
+  --zone-color-badge-bg: rgba(255, 213, 74, 0.18);
+  --zone-color-badge-text: #ffefa8;
+}
+
+.zone-defense {
+  --zone-color: var(--zone-defense);
+  --zone-color-dark: var(--zone-defense-dark);
+  --zone-color-deep: var(--zone-defense-deep);
+  --zone-color-light: var(--zone-defense-light);
+  --zone-color-accent: var(--zone-defense-accent);
+  --zone-color-ink: #f0f6ff;
+  --zone-color-ink-muted: #bcd2f0;
+  --zone-color-panel: rgba(37, 99, 235, 0.16);
+  --zone-color-panel-border: rgba(127, 178, 255, 0.34);
+  --zone-color-badge-bg: rgba(103, 232, 249, 0.16);
+  --zone-color-badge-text: #c9f4ff;
+}
+
+/* ------------------------------------------------------------------ */
+/* Card root                                                           */
+/* ------------------------------------------------------------------ */
+
+.card {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  aspect-ratio: var(--card-aspect, 63 / 88);
+  border-radius: 4.2cqw;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background:
+    radial-gradient(
+      120% 70% at 50% -10%,
+      color-mix(in srgb, var(--zone-color) 38%, transparent) 0%,
+      transparent 62%
+    ),
+    linear-gradient(178deg, var(--zone-color-deep) 0%, #05070d 78%);
+  box-shadow: var(--card-shadow);
+  container-type: inline-size;
+  color: var(--zone-color-ink);
+  font-family: var(--font-body);
+  user-select: none;
+}
+
+/* Soft zone glow behind the artwork. */
+.card::before {
+  content: '';
+  position: absolute;
+  z-index: 0;
+  inset: 12% 6% 46% 6%;
+  background: radial-gradient(
+    60% 60% at 50% 35%,
+    color-mix(in srgb, var(--zone-color) 45%, transparent) 0%,
+    transparent 72%
+  );
+  filter: blur(1.4cqw);
+  opacity: 0.75;
+  pointer-events: none;
+}
+
+/* Bottom vignette for depth. */
+.card::after {
+  content: '';
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  background: radial-gradient(
+    130% 60% at 50% 118%,
+    color-mix(in srgb, var(--zone-color-dark) 55%, transparent) 0%,
+    transparent 70%
+  );
+  pointer-events: none;
+}
+
+.card__texture {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  opacity: 0.55;
+  pointer-events: none;
+  mix-blend-mode: soft-light;
+}
+
+.zone-attack .card__texture {
+  background: repeating-linear-gradient(
+    135deg,
+    rgba(255, 220, 168, 0.14) 0 1px,
+    transparent 1px 5.4cqw
+  );
+}
+
+.zone-midfield .card__texture {
+  background-image: radial-gradient(rgba(240, 253, 244, 0.16) 0.6cqw, transparent 0.6cqw);
+  background-size: 4.6cqw 4.6cqw;
+}
+
+.zone-defense .card__texture {
+  background:
+    repeating-linear-gradient(
+      90deg,
+      rgba(201, 244, 255, 0.12) 0 1px,
+      transparent 1px 5.4cqw
+    ),
+    repeating-linear-gradient(
+      0deg,
+      rgba(201, 244, 255, 0.08) 0 1px,
+      transparent 1px 5.4cqw
+    );
+}
+
+/* ------------------------------------------------------------------ */
+/* Inner frame with content                                           */
+/* ------------------------------------------------------------------ */
+
+.card__frame {
+  position: absolute;
+  z-index: 2;
+  inset: 2.4cqw;
+  display: flex;
+  flex-direction: column;
+  gap: 2.4cqw;
+  padding: 3.4cqw;
+  border: 1px solid var(--card-frame, rgba(255, 255, 255, 0.16));
+  border-radius: 2.8cqw;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.04) 0%,
+    rgba(0, 0, 0, 0.12) 100%
+  );
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.25);
+}
+
+/* Accent corner ticks. */
+.card__frame::before,
+.card__frame::after {
+  content: '';
+  position: absolute;
+  width: 7cqw;
+  height: 7cqw;
+  pointer-events: none;
+  opacity: 0.85;
+}
+
+.card__frame::before {
+  top: -1px;
+  left: -1px;
+  border-top: 0.9cqw solid var(--zone-color-accent);
+  border-left: 0.9cqw solid var(--zone-color-accent);
+  border-top-left-radius: 2.4cqw;
+}
+
+.card__frame::after {
+  right: -1px;
+  bottom: -1px;
+  border-right: 0.9cqw solid var(--zone-color-accent);
+  border-bottom: 0.9cqw solid var(--zone-color-accent);
+  border-bottom-right-radius: 2.4cqw;
+}
+
+/* ------------------------------------------------------------------ */
+/* Header: title, subtitle, zone badge                                */
+/* ------------------------------------------------------------------ */
+
+.card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 2.4cqw;
+  flex: 0 0 auto;
+}
+
+.card__heading {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.card__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(11px, 8.4cqw, 46px);
+  font-weight: 800;
+  line-height: 1.02;
+  letter-spacing: 0.005em;
+  overflow-wrap: anywhere;
+  text-wrap: balance;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  text-shadow: 0 0.6cqw 1.6cqw rgba(0, 0, 0, 0.55);
+}
+
+.card__subtitle {
+  margin: 1.1cqw 0 0;
+  font-size: clamp(6.5px, 4cqw, 21px);
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--zone-color-ink-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ------------------------------------------------------------------ */
+/* Zone badge                                                          */
+/* ------------------------------------------------------------------ */
+
+.card-zone-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 1.4cqw;
+  flex: 0 0 auto;
+  padding: 1.2cqw 2.2cqw;
+  border-radius: var(--radius-pill);
+  border: 1px solid color-mix(in srgb, var(--zone-color) 55%, transparent);
+  background: var(--zone-color-badge-bg);
+  color: var(--zone-color-badge-text);
+  font-size: clamp(6px, 3.4cqw, 17px);
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.card-zone-badge__dot {
+  width: 1.6cqw;
+  height: 1.6cqw;
+  min-width: 5px;
+  min-height: 5px;
+  border-radius: 50%;
+  background: var(--zone-color-accent);
+  box-shadow: 0 0 1.6cqw var(--zone-color-accent);
+}
+
+/* ------------------------------------------------------------------ */
+/* Artwork                                                             */
+/* ------------------------------------------------------------------ */
+
+.card__artwork {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 40cqw;
+  overflow: hidden;
+  border-radius: 2.2cqw;
+  border: 1px solid var(--zone-color-panel-border);
+  background: rgba(0, 0, 0, 0.42);
+  box-shadow:
+    inset 0 0 2.4cqw rgba(0, 0, 0, 0.65),
+    0 0.6cqw 2cqw rgba(0, 0, 0, 0.35);
+}
+
+.card__artwork img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+.card__artwork-glow {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    rgba(0, 0, 0, 0) 52%,
+    rgba(0, 0, 0, 0.5) 100%
+  );
+}
+
+.card__artwork-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2cqw;
+  background:
+    radial-gradient(
+      70% 60% at 30% 18%,
+      rgba(255, 255, 255, 0.1) 0%,
+      transparent 60%
+    ),
+    linear-gradient(160deg, var(--zone-color-deep) 0%, rgba(0, 0, 0, 0.65) 100%);
+}
+
+.card__artwork-initial {
+  font-family: var(--font-display);
+  font-size: 24cqw;
+  font-weight: 800;
+  line-height: 1;
+  color: color-mix(in srgb, var(--zone-color-light) 22%, transparent);
+}
+
+.card__artwork-hint {
+  font-size: 3.2cqw;
+  font-weight: 600;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+/* ------------------------------------------------------------------ */
+/* Statistics                                                          */
+/* ------------------------------------------------------------------ */
+
+.card-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2.2cqw;
+  flex: 0 0 auto;
+}
+
+.card-stat {
+  display: flex;
+  align-items: center;
+  gap: 2cqw;
+  min-width: 0;
+  padding: 1.9cqw 2.4cqw;
+  border-radius: 2cqw;
+  border: 1px solid var(--zone-color-panel-border);
+  background: linear-gradient(
+    180deg,
+    var(--zone-color-panel) 0%,
+    rgba(0, 0, 0, 0.28) 100%
+  );
+  box-shadow: inset 0 0.4cqw 0 rgba(255, 255, 255, 0.06);
+}
+
+.card-stat__icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 7.4cqw;
+  height: 7.4cqw;
+  border-radius: 1.6cqw;
+  background: rgba(0, 0, 0, 0.34);
+  border: 1px solid var(--zone-color-panel-border);
+  color: var(--zone-color-accent);
+}
+
+.card-stat__icon svg {
+  width: 62%;
+  height: 62%;
+}
+
+.card-stat--defense .card-stat__icon {
+  color: var(--zone-color-light);
+}
+
+.card-stat__body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.card-stat__label {
+  font-size: 2.9cqw;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--zone-color-ink-muted);
+}
+
+.card-stat__value {
+  font-family: var(--font-display);
+  font-size: 7.2cqw;
+  font-weight: 800;
+  line-height: 1.05;
+  color: var(--zone-color-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.card-stat--attack .card-stat__value {
+  color: var(--zone-color-accent);
+}
+
+/* ------------------------------------------------------------------ */
+/* Action                                                              */
+/* ------------------------------------------------------------------ */
+
+.card__action {
+  flex: 0 0 auto;
+  padding: 2.2cqw 2.6cqw;
+  border-radius: 2cqw;
+  border: 1px solid var(--zone-color-panel-border);
+  background: linear-gradient(
+    180deg,
+    rgba(0, 0, 0, 0.18) 0%,
+    rgba(0, 0, 0, 0.42) 100%
+  );
+}
+
+.card__action-label {
+  margin: 0 0 0.9cqw;
+  font-size: 2.9cqw;
+  font-weight: 800;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--zone-color-accent);
+}
+
+.card__action-text {
+  margin: 0;
+  font-size: 3.9cqw;
+  line-height: 1.34;
+  color: var(--zone-color-ink);
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 6;
+  line-clamp: 6;
+  overflow: hidden;
+}
+
+/* ------------------------------------------------------------------ */
+/* Stars                                                               */
+/* ------------------------------------------------------------------ */
+
+.card__stars {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2.6cqw;
+  flex: 0 0 auto;
+}
+
+.card__star {
+  font-size: 5.4cqw;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.16);
+  text-shadow: 0 0.4cqw 1.2cqw rgba(0, 0, 0, 0.55);
+}
+
+.card__star--filled {
+  color: var(--zone-color-accent);
+  text-shadow: 0 0 2.2cqw color-mix(in srgb, var(--zone-color-accent) 55%, transparent);
+}
+
+/* Compact mode used in dense lists (thumbnails). */
+.card--thumb .card__frame {
+  padding: 2.4cqw;
+  gap: 1.6cqw;
+}
+
+.card--thumb .card__action,
+.card--thumb .card-stats {
+  display: none;
+}

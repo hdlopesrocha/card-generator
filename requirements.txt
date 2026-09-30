@@ -1,0 +1,1409 @@
+Here is the complete prompt, fully in English and ready to copy into an AI coding agent.
+
+# Build a Standalone Vue 3 Card Generator SPA
+
+Build a complete, production-quality **game card generator** as a standalone client-side web application.
+
+The application must use **Vue 3 + Vite** and must run entirely in the browser.
+
+There must be **NO Spring Boot, NO Thymeleaf, NO backend server, NO REST API, and NO database server**.
+
+All card data and uploaded images must be stored locally in the browser.
+
+---
+
+## 1. Technology Stack
+
+Use:
+
+* Vue 3
+* Vite
+* TypeScript
+* Vue Router
+* Pinia
+* HTML5
+* CSS3
+* Browser APIs
+* A reliable client-side PDF generation library such as `pdf-lib` or another well-maintained equivalent
+
+Use the latest stable versions compatible with each other.
+
+Do NOT use:
+
+* React
+* Angular
+* Svelte
+* Spring Boot
+* Thymeleaf
+* Java
+* Node.js backend
+* Express
+* REST APIs
+* PostgreSQL
+* MySQL
+* H2
+* Server-side rendering
+
+The application must be a **pure client-side Vue SPA**.
+
+---
+
+# 2. Language
+
+The entire application must be in **English**.
+
+This includes:
+
+* User interface
+* Navigation
+* Buttons
+* Labels
+* Form fields
+* Validation messages
+* Error messages
+* Dialogs
+* Notifications
+* Sample cards
+* Settings
+* PDF labels
+* Import/export messages
+* README
+* Source-code comments
+* Variable names
+* Component names
+* Service names
+* Documentation
+
+Do not include Portuguese or other languages.
+
+Do not implement localization/i18n unless specifically required later.
+
+---
+
+# 3. Application Purpose
+
+Create a dedicated tool for creating, editing, managing, previewing, and exporting physical game cards.
+
+The main workflow should be:
+
+1. Create a card
+2. Enter card information
+3. Upload an image
+4. Select a zone
+5. See the card update immediately in the live preview
+6. Save the card locally
+7. Edit it later if required
+8. Preview it
+9. Export one or multiple cards as a PDF
+
+The application should feel like a dedicated professional card-design tool rather than a generic CRUD application.
+
+---
+
+# 4. Card Data Model
+
+Each card must contain exactly these primary fields:
+
+* `id`
+* `title`
+* `subtitle`
+* `attack`
+* `defense`
+* `action`
+* `image`
+* `zone`
+
+Use a TypeScript model/interface similar to:
+
+```ts
+interface Card {
+  id: string
+  title: string
+  subtitle: string
+  attack: number
+  defense: number
+  action: string
+  image: string | null
+  zone: Zone
+}
+```
+
+The `Zone` type must contain exactly:
+
+```ts
+enum Zone {
+  ATTACK = 'ATTACK',
+  MIDFIELD = 'MIDFIELD',
+  DEFENSE = 'DEFENSE'
+}
+```
+
+The term must always be **"zone"**.
+
+Do NOT call it:
+
+* field zone
+* field position
+* football position
+* battlefield position
+
+The zone is a **visual card theme**, not a diagram or representation of a football field.
+
+---
+
+# 5. Zone Themes
+
+The three zones must have distinct visual themes.
+
+## ATTACK
+
+Primary visual identity:
+
+* Red
+
+## MIDFIELD
+
+Primary visual identity:
+
+* Green
+
+## DEFENSE
+
+Primary visual identity:
+
+* Blue
+
+The zone must influence the complete visual appearance of the card.
+
+It should affect:
+
+* Background
+* Gradients
+* Borders
+* Decorative elements
+* Accent panels
+* Highlights
+* Stat areas
+* Visual emphasis
+
+Do NOT simply change the entire card into a flat solid red, green, or blue rectangle.
+
+Use a professional combination of:
+
+* Gradients
+* Subtle patterns
+* Panels
+* Borders
+* Highlights
+* Shadows
+* Contrast
+* Decorative geometry
+
+Centralize the colors with CSS variables, for example:
+
+```css
+:root {
+  --zone-attack: ...;
+  --zone-midfield: ...;
+  --zone-defense: ...;
+}
+```
+
+Use classes such as:
+
+```css
+.card.zone-attack
+.card.zone-midfield
+.card.zone-defense
+```
+
+The same zone styling must be used consistently in:
+
+* Live web preview
+* Card preview page
+* PDF output
+
+The zone name should also be displayed as text on the card.
+
+---
+
+# 6. Card Visual Design
+
+The card must look like a professional physical trading/strategy card.
+
+Use:
+
+* Fixed card aspect ratio
+* Rounded corners
+* Strong visual hierarchy
+* Decorative borders
+* Controlled shadows
+* Prominent artwork
+* Clear statistics
+* Distinct Attack and Defense areas
+* Action section
+* Visible zone indicator
+* Good spacing
+* Strong typography
+* Professional alignment
+
+Avoid excessive clutter.
+
+The card should look believable as something that could actually be printed.
+
+The title must be prominent.
+
+Long titles must not:
+
+* Overflow
+* Clip
+* Destroy the layout
+
+Use appropriate wrapping, sizing, or constrained typography.
+
+The subtitle should be visually subordinate to the title and must also handle long text correctly.
+
+The action text must wrap correctly and must never overflow its container.
+
+---
+
+# 7. Application Layout
+
+Create a modern application shell.
+
+Suggested layout:
+
+```text
+┌──────────────────────────────────────────────┐
+│ Card Generator                               │
+├───────────────┬──────────────────────────────┤
+│ Navigation    │ Main Content                 │
+│               │                              │
+│ Cards         │                              │
+│ New Card      │                              │
+│ Settings      │                              │
+│               │                              │
+└───────────────┴──────────────────────────────┘
+```
+
+The interface should work well on:
+
+* Desktop
+* Tablet
+* Mobile
+
+On small screens, navigation and editor sections should adapt appropriately.
+
+---
+
+# 8. Routes
+
+Use Vue Router.
+
+Provide routes similar to:
+
+```text
+/
+ /cards
+ /cards/new
+ /cards/:id/edit
+ /cards/:id/preview
+ /settings
+```
+
+The root route should redirect to the card list.
+
+Do not reload the browser when navigating between application views.
+
+---
+
+# 9. Card List
+
+Create a card-management page.
+
+Display all locally stored cards.
+
+Each card entry should show:
+
+* Image thumbnail
+* Title
+* Subtitle
+* Attack
+* Defense
+* Zone
+
+Provide actions:
+
+* Edit
+* Preview
+* Generate PDF
+* Delete
+
+Provide a prominent:
+
+**Create New Card**
+
+button.
+
+Handle the empty state professionally when no cards exist.
+
+For example:
+
+> No cards created yet.
+
+with a button to create the first card.
+
+---
+
+# 10. Card Editor
+
+Create a dedicated card editor.
+
+Desktop layout:
+
+```text
+┌──────────────────────────┬──────────────────────────┐
+│ FORM                     │ LIVE CARD PREVIEW        │
+│                          │                          │
+│ Title                    │                          │
+│ Subtitle                 │                          │
+│ Attack                   │                          │
+│ Defense                  │                          │
+│ Action                   │                          │
+│ Image                    │                          │
+│ Zone                     │                          │
+│                          │                          │
+│ Save / Cancel / PDF      │                          │
+└──────────────────────────┴──────────────────────────┘
+```
+
+On mobile, stack the form and preview vertically.
+
+Fields:
+
+* Title
+* Subtitle
+* Attack
+* Defense
+* Action
+* Image
+* Zone
+
+Buttons:
+
+* Save
+* Cancel
+* Preview
+* Generate PDF
+
+---
+
+# 11. Live Preview
+
+The preview must update immediately without reloading the page.
+
+When the user changes:
+
+* Title
+* Subtitle
+* Attack
+* Defense
+* Action
+* Image
+* Zone
+
+the card preview must update immediately.
+
+For example, selecting:
+
+```text
+ATTACK
+```
+
+must immediately change the card to its red Attack visual theme.
+
+Selecting:
+
+```text
+MIDFIELD
+```
+
+must immediately change it to the green Midfield theme.
+
+Selecting:
+
+```text
+DEFENSE
+```
+
+must immediately change it to the blue Defense theme.
+
+Use Vue's reactive state rather than manually rebuilding HTML.
+
+Keep JavaScript lightweight and component-based.
+
+---
+
+# 12. Image Upload
+
+Allow the user to upload card artwork.
+
+Support:
+
+* PNG
+* JPEG/JPG
+* WebP
+
+Validate:
+
+* File type
+* MIME type
+* Extension
+* File size
+
+Use a sensible maximum size, such as:
+
+```text
+5 MB
+```
+
+Do not trust the file extension alone.
+
+Generate a safe browser-local representation using an appropriate mechanism such as:
+
+* Object URLs
+* FileReader
+* Base64
+* IndexedDB blobs
+
+Do not expose arbitrary filesystem paths.
+
+Do not assume access to the user's filesystem after the browser file picker closes.
+
+The uploaded image must:
+
+* Preserve aspect ratio
+* Never be distorted
+* Fit its card artwork container
+* Support cropping/object-fit where appropriate
+* Have a sensible fallback when no image exists
+
+Do not unnecessarily upscale small images.
+
+---
+
+# 13. Local Persistence
+
+The application must work without a backend.
+
+Persist cards locally.
+
+Prefer **IndexedDB** for storing cards and image data.
+
+Do not rely solely on localStorage for large image files.
+
+Create a clean persistence abstraction, for example:
+
+```text
+src/services/storage/
+```
+
+or:
+
+```text
+src/repositories/
+```
+
+The rest of the application should not need to know the IndexedDB implementation details.
+
+The persistence layer should support:
+
+* Create
+* Read
+* Read all
+* Update
+* Delete
+
+Generate unique card IDs.
+
+Cards must remain available after refreshing the browser.
+
+---
+
+# 14. Pinia State Management
+
+Use Pinia for application state.
+
+Create a card store responsible for:
+
+* Card collection
+* Current card
+* Loading state
+* Error state
+* Create
+* Update
+* Delete
+* Loading from IndexedDB
+
+Do not put all application logic into Vue components.
+
+Keep business logic in stores/services where appropriate.
+
+---
+
+# 15. Component Architecture
+
+Use reusable Vue components.
+
+Suggested structure:
+
+```text
+src/
+├── components/
+│   ├── CardPreview.vue
+│   ├── CardStats.vue
+│   ├── CardImage.vue
+│   ├── CardZoneBadge.vue
+│   ├── CardEditorForm.vue
+│   ├── ImageUploader.vue
+│   ├── CardListItem.vue
+│   ├── EmptyState.vue
+│   ├── ConfirmDialog.vue
+│   └── AppNavigation.vue
+│
+├── views/
+│   ├── CardListView.vue
+│   ├── CardEditorView.vue
+│   ├── CardPreviewView.vue
+│   └── SettingsView.vue
+│
+├── stores/
+│   └── cardStore.ts
+│
+├── services/
+│   ├── storage/
+│   │   └── indexedDb.ts
+│   └── pdf/
+│       └── cardPdfService.ts
+│
+├── models/
+│   └── Card.ts
+│
+├── router/
+│   └── index.ts
+│
+├── styles/
+│   ├── variables.css
+│   ├── application.css
+│   └── card.css
+│
+├── App.vue
+└── main.ts
+```
+
+Adjust the structure if necessary, but maintain a clean separation of responsibilities.
+
+---
+
+# 16. PDF Generation
+
+PDF generation must happen entirely in the browser.
+
+Create a dedicated service such as:
+
+```text
+CardPdfService
+```
+
+It should provide functionality equivalent to:
+
+```ts
+generateCardPdf(card: Card)
+```
+
+and:
+
+```ts
+generateCardsPdf(
+  cards: Card[],
+  cardsPerPage: 1 | 2 | 4 | 9
+)
+```
+
+Do not use screenshots of the browser UI as the primary PDF generation mechanism.
+
+Generate a proper PDF document.
+
+The PDF must contain:
+
+* Card artwork
+* Title
+* Subtitle
+* Attack
+* Defense
+* Action
+* Zone
+* Zone-specific theme
+
+---
+
+# 17. PDF Layout Options
+
+Allow the user to select:
+
+```text
+1 card per page
+2 cards per page
+4 cards per page
+9 cards per page
+```
+
+The layout must automatically calculate:
+
+* Rows
+* Columns
+* Card dimensions
+* Margins
+* Spacing
+
+The physical card aspect ratio must remain constant.
+
+Do not stretch cards.
+
+Do not distort images.
+
+Do not allow cards to overlap.
+
+Do not allow cards to be clipped.
+
+Do not let content escape the card boundaries.
+
+---
+
+# 18. PDF Physical Dimensions
+
+Make the physical card dimensions configurable.
+
+Provide sensible defaults suitable for a physical game card.
+
+The PDF generation system must use explicit dimensions rather than relying on browser viewport dimensions.
+
+The resulting card must maintain a consistent aspect ratio between:
+
+* Web preview
+* Print/PDF output
+
+---
+
+# 19. PDF Design
+
+Create a dedicated PDF rendering implementation rather than simply exporting the entire application UI.
+
+The PDF renderer should reproduce the card design.
+
+PDF layout must use techniques known to work reliably with the selected PDF library.
+
+Do not rely on:
+
+* JavaScript inside the PDF
+* Browser-specific layout behavior
+* Unsupported CSS effects
+* Dynamic browser APIs
+
+Use explicit dimensions and reliable positioning.
+
+The final PDF must be suitable for printing.
+
+---
+
+# 20. PDF Export UI
+
+Provide an export dialog where the user can select:
+
+* Cards to export
+* Cards per page
+* 1 / 2 / 4 / 9
+
+Allow:
+
+* Export current card
+* Export selected cards
+* Export all cards
+
+Use meaningful filenames such as:
+
+```text
+warrior-card.pdf
+cards-2026-09-30.pdf
+```
+
+Sanitize filenames.
+
+Trigger a browser download.
+
+---
+
+# 21. Validation
+
+Implement client-side validation.
+
+Required fields:
+
+* Title
+* Attack
+* Defense
+* Action
+* Zone
+
+Subtitle may be optional.
+
+Image may be optional.
+
+Attack and defense must be numeric.
+
+Use sensible limits.
+
+For example:
+
+```text
+minimum: 0
+maximum: 999
+```
+
+The exact limits should be centralized as constants.
+
+Display friendly validation errors next to the relevant fields.
+
+Do not allow invalid cards to be saved.
+
+---
+
+# 22. Zone Validation
+
+The zone must always be one of:
+
+```text
+ATTACK
+MIDFIELD
+DEFENSE
+```
+
+Do not use arbitrary strings throughout the application.
+
+Use the TypeScript enum or equivalent strongly typed representation.
+
+Centralize zone metadata so adding another zone later is easy.
+
+For example:
+
+```ts
+const zoneConfig = {
+  ATTACK: {
+    label: 'Attack',
+    ...
+  },
+  MIDFIELD: {
+    label: 'Midfield',
+    ...
+  },
+  DEFENSE: {
+    label: 'Defense',
+    ...
+  }
+}
+```
+
+This configuration should control the visual theme consistently.
+
+---
+
+# 23. Card Preview
+
+Provide a dedicated full-card preview route.
+
+The preview should show the card at a large physical-card-like scale.
+
+Provide:
+
+* Back to editor
+* Edit
+* Generate PDF
+
+The preview must use the same card component/design as the editor preview whenever practical.
+
+Avoid maintaining multiple independent implementations of the card appearance.
+
+---
+
+# 24. Responsive Design
+
+The application must be responsive.
+
+Desktop:
+
+```text
+Editor + Preview side by side
+```
+
+Tablet:
+
+```text
+Reduced-width columns
+```
+
+Mobile:
+
+```text
+Editor
+↓
+Preview
+```
+
+The card itself should retain its aspect ratio.
+
+Do not allow responsive layout changes to distort the card.
+
+---
+
+# 25. Accessibility
+
+Use:
+
+* Semantic HTML
+* Labels for form controls
+* Keyboard-accessible controls
+* Visible focus states
+* Appropriate button labels
+* Alt text for images
+* Sufficient contrast
+
+Do not make important functionality accessible only through hover effects.
+
+---
+
+# 26. Error Handling
+
+Handle errors gracefully.
+
+Examples:
+
+* Invalid image
+* Oversized image
+* Corrupted image
+* Card not found
+* IndexedDB failure
+* PDF generation failure
+* Invalid form data
+* Browser storage unavailable
+
+Show friendly messages to the user.
+
+Do not expose raw technical errors in the UI.
+
+Log useful technical information to the console where appropriate.
+
+---
+
+# 27. Delete Confirmation
+
+Deleting a card must require confirmation.
+
+For example:
+
+> Delete this card?
+
+with:
+
+* Cancel
+* Delete
+
+Do not accidentally delete cards from a single misclick.
+
+---
+
+# 28. Sample Cards
+
+Include sample/demo cards on first launch when no cards exist.
+
+Use:
+
+### Warrior
+
+Subtitle:
+
+```text
+Frontline Fighter
+```
+
+Attack:
+
+```text
+120
+```
+
+Defense:
+
+```text
+90
+```
+
+Action:
+
+```text
+Charge the nearest enemy and gain additional attack power.
+```
+
+Zone:
+
+```text
+ATTACK
+```
+
+### Tactician
+
+Subtitle:
+
+```text
+Battlefield Strategist
+```
+
+Attack:
+
+```text
+80
+```
+
+Defense:
+
+```text
+100
+```
+
+Action:
+
+```text
+Increase the effectiveness of nearby allies.
+```
+
+Zone:
+
+```text
+MIDFIELD
+```
+
+### Guardian
+
+Subtitle:
+
+```text
+Defensive Sentinel
+```
+
+Attack:
+
+```text
+60
+```
+
+Defense:
+
+```text
+150
+```
+
+Action:
+
+```text
+Protect an allied card from the next attack.
+```
+
+Zone:
+
+```text
+DEFENSE
+```
+
+These should demonstrate the three visual themes.
+
+---
+
+# 29. Settings
+
+Create a simple settings page.
+
+Possible settings:
+
+* Default PDF cards per page
+* Card width
+* Card height
+* Image quality
+* Clear all local cards
+* Restore demo cards
+
+Do not overcomplicate settings.
+
+Keep the core card editor fast and simple.
+
+---
+
+# 30. Data Import/Export
+
+Because there is no backend, provide a way to back up the user's cards.
+
+Implement:
+
+## Export Data
+
+Download all cards as a JSON backup.
+
+Images may be embedded as Base64 or another portable representation.
+
+## Import Data
+
+Allow the user to select a previously exported JSON file.
+
+Validate imported data before storing it.
+
+Do not blindly trust imported JSON.
+
+Reject malformed or incompatible data gracefully.
+
+This allows users to move their card collection between browsers/devices manually.
+
+---
+
+# 31. Security
+
+Even though this is a client-only application, follow safe practices.
+
+Do not inject user-entered HTML directly into the DOM.
+
+Vue's normal template interpolation should be used for text.
+
+Do not use `v-html` for user-entered card content unless absolutely necessary.
+
+Validate imported JSON.
+
+Validate image MIME types and sizes.
+
+Sanitize generated filenames.
+
+Do not construct unsafe filesystem paths.
+
+Do not execute user-provided JavaScript.
+
+---
+
+# 32. Performance
+
+Keep the application responsive.
+
+Avoid unnecessary component re-renders.
+
+Use Vue's reactivity correctly.
+
+Do not repeatedly convert large images to Base64 during every preview update.
+
+Cache processed image representations when appropriate.
+
+Do not generate PDFs until requested.
+
+Do not regenerate PDFs on every form change.
+
+The live preview should remain responsive even with relatively large images.
+
+---
+
+# 33. Styling
+
+Use a coherent design system.
+
+Centralize:
+
+* Spacing
+* Typography
+* Border radii
+* Shadows
+* Card dimensions
+* Zone colors
+
+Use CSS variables.
+
+Example conceptual structure:
+
+```css
+:root {
+  --zone-attack: ...;
+  --zone-midfield: ...;
+  --zone-defense: ...;
+
+  --card-radius: ...;
+  --card-shadow: ...;
+}
+```
+
+The card design should be visually rich but controlled.
+
+Avoid generic-looking HTML forms.
+
+The application should feel like a purpose-built card creation tool.
+
+---
+
+# 34. Project Configuration
+
+Create:
+
+```text
+package.json
+vite.config.ts
+tsconfig.json
+index.html
+```
+
+Use npm-compatible scripts:
+
+```text
+npm install
+npm run dev
+npm run build
+npm run preview
+```
+
+The project must build successfully with:
+
+```bash
+npm run build
+```
+
+Do not require any backend service.
+
+---
+
+# 35. README
+
+Create a complete README explaining:
+
+* Prerequisites
+* Node.js version
+* Installation
+* Development
+* Production build
+* Preview
+* Project structure
+* Local storage architecture
+* IndexedDB
+* Image handling
+* PDF generation
+* Card design
+* Zone themes
+* PDF layouts
+* JSON backup/import
+* Limitations of a client-only application
+
+Explicitly state that no backend is required.
+
+The README must be entirely in English.
+
+---
+
+# 36. Testing
+
+Add meaningful tests.
+
+Test at minimum:
+
+## Card Validation
+
+* Valid card
+* Missing title
+* Invalid attack
+* Invalid defense
+* Invalid zone
+* Excessive values
+
+## Persistence
+
+* Create
+* Read
+* Update
+* Delete
+
+## Import/Export
+
+* Valid backup
+* Malformed backup
+* Invalid card data
+
+## Image Handling
+
+* Supported image
+* Unsupported image
+* Oversized image
+
+## PDF
+
+* Single card
+* Multiple cards
+* 1 card/page
+* 2 cards/page
+* 4 cards/page
+* 9 cards/page
+
+Verify that PDF generation produces a non-empty valid PDF.
+
+---
+
+# 37. Important PDF Requirements
+
+Pay particular attention to:
+
+* No clipping
+* No overflow
+* No distorted artwork
+* Correct card aspect ratio
+* Correct margins
+* Correct number of cards per page
+* Consistent zone colors
+* Readable typography
+* Correct title wrapping
+* Correct action wrapping
+* Consistent spacing
+
+The PDF must look like an actual printable card sheet rather than a screenshot of the web page.
+
+---
+
+# 38. Architecture Requirements
+
+Keep these responsibilities separated:
+
+```text
+Vue Components
+      ↓
+Pinia Stores
+      ↓
+Application Services
+      ↓
+IndexedDB / PDF Services
+```
+
+Do not put all application logic inside `App.vue`.
+
+Do not put persistence logic directly into every component.
+
+Do not duplicate card rendering logic unnecessarily.
+
+Use reusable components and services.
+
+---
+
+# 39. Extensibility
+
+The architecture must make it easy to add future features such as:
+
+* Additional card statistics
+* Additional zones
+* Card rarity
+* Card types
+* Multiple card templates
+* Card backs
+* Custom fonts
+* Drag-and-drop card ordering
+* Batch PDF export
+* Additional export formats
+
+Adding a new zone should primarily require updating centralized zone configuration rather than rewriting the entire card renderer.
+
+---
+
+# 40. Final Implementation Requirement
+
+Do not provide pseudocode.
+
+Do not provide an incomplete skeleton.
+
+Actually implement the application.
+
+Create all required:
+
+* Vue components
+* Views
+* Stores
+* TypeScript models
+* Services
+* IndexedDB persistence
+* Image handling
+* PDF generation
+* Routing
+* CSS
+* Responsive layouts
+* Validation
+* Import/export
+* Error handling
+* Sample cards
+* Tests
+* Configuration
+* README
+
+The finished project must be runnable immediately after:
+
+```bash
+npm install
+npm run dev
+```
+
+and must build successfully with:
+
+```bash
+npm run build
+```
+
+---
+
+# 41. Final Verification Checklist
+
+Before considering the implementation complete, verify all of the following:
+
+1. Application starts with `npm run dev`.
+2. Production build succeeds with `npm run build`.
+3. No backend is required.
+4. No Spring Boot exists.
+5. No Thymeleaf exists.
+6. Vue 3 is used.
+7. Vite is used.
+8. TypeScript is used.
+9. Vue Router works.
+10. Pinia works.
+11. Cards persist after browser refresh.
+12. Images persist correctly.
+13. Cards can be created.
+14. Cards can be edited.
+15. Cards can be deleted.
+16. Cards can be previewed.
+17. Live preview updates immediately.
+18. ATTACK uses a red visual theme.
+19. MIDFIELD uses a green visual theme.
+20. DEFENSE uses a blue visual theme.
+21. Zone styling affects the complete card design rather than just one flat background.
+22. Long titles do not overflow.
+23. Long action text does not overflow.
+24. Images preserve their aspect ratio.
+25. PDF generation works.
+26. One-card PDF works.
+27. Two-cards-per-page PDF works.
+28. Four-cards-per-page PDF works.
+29. Nine-cards-per-page PDF works.
+30. PDF cards are not clipped or distorted.
+31. JSON backup works.
+32. JSON import works.
+33. Invalid imported data is rejected safely.
+34. Image validation works.
+35. Delete confirmation works.
+36. Responsive layout works.
+37. Accessibility basics are implemented.
+38. Tests are present and meaningful.
+39. README is complete and entirely in English.
+40. The entire user interface is in English.
+41. The final result looks like a professional dedicated game-card generator, not a generic CRUD application.
+
