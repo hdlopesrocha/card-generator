@@ -35,7 +35,7 @@ describe('live language switching', () => {
     const wrapper = mount(App, { global: { plugins: [pinia, router] } })
     await settle()
 
-    const titlesBefore = wrapper.findAll('.card-list-item__title').map((node) => node.text())
+    const titlesBefore = wrapper.findAll('.card__title').map((node) => node.text())
     expect(titlesBefore.sort()).toEqual(['Guardian', 'Tactician', 'Warrior'])
 
     const trigger = wrapper.find('.language-picker__button')
@@ -50,7 +50,7 @@ describe('live language switching', () => {
     await portuguese.trigger('click')
     await settle()
 
-    const titlesAfter = wrapper.findAll('.card-list-item__title').map((node) => node.text())
+    const titlesAfter = wrapper.findAll('.card__title').map((node) => node.text())
     expect(titlesAfter.sort()).toEqual(['Guardião', 'Guerreiro', 'Tático'])
 
     const languageStore = useLanguageStore()

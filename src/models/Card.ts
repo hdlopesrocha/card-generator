@@ -39,6 +39,11 @@ export interface Card {
    * base fields above; missing languages fall back to English when rendered.
    */
   translations: CardTranslations
+  /**
+   * File name of the image (bundled sample or local library entry) this card
+   * references. CSV exports write this reference instead of the image data.
+   */
+  imageRef?: string | null
 }
 
 /**
@@ -114,6 +119,7 @@ export function createEmptyCardDraft(zone: Zone = Zone.ATTACK): CardDraft {
     zone,
     stars: MIN_STARS,
     translations: {},
+    imageRef: null,
   }
 }
 
@@ -141,6 +147,7 @@ export function cardFromDraft(draft: CardDraft, language: Language = 'EN'): Card
     zone: normalizeZone(draft.zone),
     stars: normalizeStars(draft.stars),
     translations,
+    imageRef: draft.imageRef ?? null,
   }
 }
 
@@ -157,5 +164,6 @@ export function draftFromCard(card: Card): CardDraft {
     zone: card.zone,
     stars: normalizeStars(card.stars),
     translations: normalizeTranslations(card.translations),
+    imageRef: card.imageRef ?? null,
   }
 }

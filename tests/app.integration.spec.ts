@@ -244,7 +244,7 @@ describe('application integration', () => {
     expect(emitted?.[0]?.[0]).toEqual({ cards: [cards[0]] })
   })
 
-  it('imports a CSV file, creates the cards and downloads a PDF', async () => {
+  it('imports a CSV file and creates the cards without exporting a PDF', async () => {
     await router.push('/cards')
     await router.isReady()
 
@@ -262,30 +262,22 @@ describe('application integration', () => {
     ].join('\n')
     const file = new File([csv], 'cards.csv', { type: 'text/csv' })
 
-    const originalCreateObjectURL = URL.createObjectURL
-    const originalRevokeObjectURL = URL.revokeObjectURL
     const createObjectURL = vi.fn(() => 'blob:mock')
-    const revokeObjectURL = vi.fn()
     URL.createObjectURL = createObjectURL
-    URL.revokeObjectURL = revokeObjectURL
-    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
 
     try {
       const input = wrapper.find('input[type="file"]')
       Object.defineProperty(input.element, 'files', { value: [file], configurable: true })
       await input.trigger('change')
 
-      await vi.waitFor(() => expect(createObjectURL).toHaveBeenCalledTimes(1))
+      await vi.waitFor(() => expect(store.cardCount).toBe(before + 3))
 
-      expect(store.cardCount).toBe(before + 3)
       expect(store.cards.map((card) => card.title)).toEqual(
         expect.arrayContaining(['Warrior', 'Tactician', 'Guardian']),
       )
-      expect(clickSpy).toHaveBeenCalled()
-      expect(wrapper.text()).toContain('Created 3 cards from the CSV and generated the PDF.')
+      expect(createObjectURL).not.toHaveBeenCalled()
+      expect(wrapper.text()).toContain('Created 3 cards from the CSV.')
     } finally {
-      URL.createObjectURL = originalCreateObjectURL
-      URL.revokeObjectURL = originalRevokeObjectURL
       vi.restoreAllMocks()
     }
   })
@@ -312,6 +304,46 @@ describe('application integration', () => {
     expect(wrapper.text()).toContain('1 invalid row')
     expect(wrapper.text()).toContain('Row 2')
     expect(wrapper.text()).toContain('Attack must be a number')
+  })
+
+  it('downloads the current cards as a CSV file', async () => {
+    await router.push('/cards')
+    await router.isReady()
+
+    const wrapper = mount(CardListView, { global: { plugins: [pinia, router] } })
+    await settle()
+
+    const store = useCardStore()
+    expect(store.cardCount).toBeGreaterThan(0)
+
+    let blob: Blob | null = null
+    const originalCreateObjectURL = URL.createObjectURL
+    const originalRevokeObjectURL = URL.revokeObjectURL
+    URL.createObjectURL = vi.fn((value: Blob) => {
+      blob = value
+      return 'blob:csv'
+    })
+    URL.revokeObjectURL = vi.fn()
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+
+    try {
+      const button = wrapper
+        .findAll('button')
+        .find((candidate) => candidate.text().includes('Download CSV'))
+      expect(button).toBeDefined()
+      await button!.trigger('click')
+      await settle()
+
+      expect(blob).not.toBeNull()
+      const text = await (blob as unknown as Blob).text()
+      expect(text.startsWith('title,')).toBe(true)
+      expect(text).toContain('Warrior')
+      expect(wrapper.text()).toContain(`CSV with ${store.cardCount} cards was generated.`)
+    } finally {
+      URL.createObjectURL = originalCreateObjectURL
+      URL.revokeObjectURL = originalRevokeObjectURL
+      vi.restoreAllMocks()
+    }
   })
 
   it('deletes all cards after confirmation from the cards page', async () => {

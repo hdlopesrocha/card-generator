@@ -68,3 +68,35 @@ export async function resolveBundledImagesInText(
 
   return resolved
 }
+
+let allBundledImagesPromise: Promise<ReadonlyMap<string, string>> | null = null
+
+/**
+ * Resolves every bundled image once and caches the result. Used to recover
+ * file names when exporting cards whose reference was not stored.
+ */
+export function resolveAllBundledImages(): Promise<ReadonlyMap<string, string>> {
+  if (!allBundledImagesPromise) {
+    allBundledImagesPromise = (async () => {
+      const resolved = new Map<string, string>()
+
+      for (const [path, load] of Object.entries(imageLoaders)) {
+        const name = basename(path)
+        if (!name || resolved.has(name)) continue
+
+        try {
+          const dataUrl = await load()
+          if (dataUrl.startsWith('data:image/')) {
+            resolved.set(name, dataUrl)
+          }
+        } catch {
+          continue
+        }
+      }
+
+      return resolved
+    })()
+  }
+
+  return allBundledImagesPromise
+}

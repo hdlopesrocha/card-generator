@@ -39,6 +39,9 @@ import { normalizeStars } from '@/models/Card'
 import type { Language } from '@/models/Language'
 import { dataUrlToUint8Array, detectImageType } from '@/services/image/imageService'
 import { getLocalizedCard } from '@/services/localization/cardLocalization'
+import { formatDate, sanitizeFilename } from '@/utils/filename'
+
+export { sanitizeFilename }
 
 /** Optional physical dimensions and content language for the generated PDF. */
 export interface PdfGenerationOptions {
@@ -84,26 +87,12 @@ export async function generateCardsPdf(
   return document.save()
 }
 
-export function sanitizeFilename(name: string): string {
-  const collapsed = name
-    .toLowerCase()
-    .replace(/[^a-z0-9-]+/g, '-')
-    .replace(/-{2,}/g, '-')
-    .slice(0, 80)
-    .replace(/^-+|-+$/g, '')
-
-  return collapsed || 'card'
-}
-
 export function buildCardsPdfFilename(cards: Card[], date: Date = new Date()): string {
   if (cards.length === 1) {
     return `${sanitizeFilename(cards[0].title || 'card')}-card.pdf`
   }
 
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `cards-${year}-${month}-${day}.pdf`
+  return `cards-${formatDate(date)}.pdf`
 }
 
 export function downloadPdf(data: Uint8Array, filename: string): void {

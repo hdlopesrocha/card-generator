@@ -2,16 +2,19 @@
 import { computed, ref, useId } from 'vue'
 import { IMAGE_QUALITY } from '@/config/constants'
 import { fileToOptimizedDataUrl, validateImageFile } from '@/services/image/imageService'
+import { useImageLibraryStore } from '@/stores/imageLibraryStore'
 import { useLanguageStore } from '@/stores/languageStore'
 
 const props = withDefaults(
   defineProps<{
     modelValue: string | null
+    imageRef?: string | null
     error?: string
     quality?: number
     label?: string
   }>(),
   {
+    imageRef: null,
     error: undefined,
     quality: undefined,
     label: undefined,
@@ -20,12 +23,14 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   'update:modelValue': [value: string | null]
+  'update:imageRef': [value: string | null]
   error: [message: string | null]
 }>()
 
 const FILE_ACCEPT = '.png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp'
 
 const languageStore = useLanguageStore()
+const imageLibrary = useImageLibraryStore()
 
 const uid = useId()
 const hintId = `image-uploader-hint-${uid}`
@@ -56,7 +61,15 @@ async function processFile(file: File): Promise<void> {
     const dataUrl = await fileToOptimizedDataUrl(file, {
       quality: props.quality ?? IMAGE_QUALITY.default,
     })
+
+    const stored = await imageLibrary.addProcessedImage({
+      name: file.name,
+      dataUrl,
+      size: file.size,
+    })
+
     emit('update:modelValue', dataUrl)
+    emit('update:imageRef', stored?.name ?? file.name)
   } catch {
     emit('error', languageStore.t('error.imageProcess'))
   } finally {
@@ -85,6 +98,7 @@ function handleDrop(event: DragEvent): void {
 
 function removeImage(): void {
   emit('update:modelValue', null)
+  emit('update:imageRef', null)
   emit('error', null)
 
   if (fileInput.value) {

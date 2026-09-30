@@ -6,7 +6,8 @@ import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import ExportDialog from '@/components/ExportDialog.vue'
 import type { Card } from '@/models/Card'
-import { parseCardsCsvFile } from '@/services/csv/csvService'
+import { parseCardsCsvFile, downloadCardsCsv } from '@/services/csv/csvService'
+import { resolveAllBundledImages } from '@/services/image/bundledImages'
 import { generateAndDownloadCardPdf, generateAndDownloadCardsPdf } from '@/services/pdf/cardPdfService'
 import { useCardStore } from '@/stores/cardStore'
 import { useImageLibraryStore } from '@/stores/imageLibraryStore'
@@ -173,6 +174,25 @@ function handleExport(payload: { cards: Card[] }): void {
   void printCards(payload.cards)
 }
 
+async function handleExportCsv(): Promise<void> {
+  clearStatus()
+
+  try {
+    const bundled = await resolveAllBundledImages()
+    const images = new Map(bundled)
+
+    for (const [name, dataUrl] of imageLibrary.imagesByName) {
+      images.set(name, dataUrl)
+    }
+
+    downloadCardsCsv(store.cards, { images })
+    setStatus('success', t('cards.statusCsvExported', { count: store.cardCount }))
+  } catch (error) {
+    console.error('Failed to export the cards CSV.', error)
+    setStatus('error', t('cards.statusCsvExportFailed'))
+  }
+}
+
 function openCsvPicker(): void {
   csvInput.value?.click()
 }
@@ -203,16 +223,7 @@ async function handleCsvImport(event: Event): Promise<void> {
       return
     }
 
-    try {
-      await generateAndDownloadCardsPdf(result.cards, {
-        ...pdfOptions.value,
-        language: languageStore.language,
-      })
-      setStatus('success', t('cards.statusCsvImported', { count }))
-    } catch (error) {
-      console.error('Failed to generate the CSV cards PDF.', error)
-      setStatus('error', t('cards.statusCsvPartial', { count }))
-    }
+    setStatus('success', t('cards.statusCsvImported', { count }))
   } catch (error) {
     console.error('Failed to import the CSV file.', error)
     setStatus('error', t('cards.statusCsvImportFailed'))
@@ -250,6 +261,14 @@ async function handleCsvImport(event: Event): Promise<void> {
           @click="openExport"
         >
           {{ t('cards.exportAll') }}
+        </button>
+        <button
+          type="button"
+          class="btn btn--secondary"
+          :disabled="store.cardCount === 0"
+          @click="handleExportCsv"
+        >
+          {{ t('cards.exportCsv') }}
         </button>
         <RouterLink class="btn btn--secondary" to="/settings">
           {{ t('cards.backupImport') }}

@@ -4,6 +4,7 @@ import { computed, onMounted, ref } from 'vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import { getBundledImageNames, resolveBundledImage } from '@/services/image/bundledImages'
+import { buildImagesZip, buildImagesZipFilename, downloadBlob } from '@/services/image/zipService'
 import type { StoredImage } from '@/services/storage/indexedDb'
 import { useImageLibraryStore } from '@/stores/imageLibraryStore'
 import { useLanguageStore } from '@/stores/languageStore'
@@ -22,6 +23,7 @@ const statusMessage = ref('')
 const statusKind = ref<'success' | 'error'>('success')
 const deleteTarget = ref<StoredImage | null>(null)
 const deleting = ref(false)
+const zipping = ref(false)
 
 const bundledImages = ref<BundledImageEntry[]>(
   getBundledImageNames().map((name) => ({ name, dataUrl: null })),
@@ -94,6 +96,32 @@ async function copyName(name: string): Promise<void> {
   }
 }
 
+async function handleDownloadZip(): Promise<void> {
+  clearStatus()
+
+  const entries = [
+    ...store.images.map((image) => ({ name: image.name, dataUrl: image.dataUrl })),
+    ...bundledImages.value
+      .filter((entry): entry is BundledImageEntry & { dataUrl: string } => entry.dataUrl !== null)
+      .map((entry) => ({ name: entry.name, dataUrl: entry.dataUrl })),
+  ]
+
+  if (entries.length === 0) return
+
+  zipping.value = true
+
+  try {
+    const blob = await buildImagesZip(entries)
+    downloadBlob(blob, buildImagesZipFilename())
+    setStatus('success', t('images.statusZip', { count: entries.length }))
+  } catch (error) {
+    console.error('Failed to build the images ZIP.', error)
+    setStatus('error', t('images.zipFailed'))
+  } finally {
+    zipping.value = false
+  }
+}
+
 function requestDelete(image: StoredImage): void {
   clearStatus()
   deleteTarget.value = image
@@ -144,6 +172,14 @@ function formatSize(bytes: number): string {
           @click="openPicker"
         >
           {{ store.uploading ? t('images.uploading') : t('images.upload') }}
+        </button>
+        <button
+          type="button"
+          class="btn btn--secondary"
+          :disabled="zipping"
+          @click="handleDownloadZip"
+        >
+          {{ zipping ? t('images.zipping') : t('images.downloadZip') }}
         </button>
         <input
           ref="fileInput"

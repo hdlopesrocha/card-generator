@@ -133,6 +133,10 @@ function normalizeImportedCard(value: unknown): Card | null {
   const subtitle = typeof value.subtitle === 'string' ? value.subtitle : ''
   const action = typeof value.action === 'string' ? value.action : ''
   const image = typeof value.image === 'string' ? value.image : null
+  const imageRef =
+    typeof value.imageRef === 'string' && value.imageRef.trim().length > 0
+      ? value.imageRef.trim()
+      : null
 
   const translations = normalizeImportedTranslations(value.translations)
   if (translations === null) return null
@@ -170,6 +174,7 @@ function normalizeImportedCard(value: unknown): Card | null {
     zone: normalizeZone(value.zone),
     stars,
     translations,
+    imageRef,
   }
 }
 

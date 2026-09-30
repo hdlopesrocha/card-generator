@@ -288,9 +288,11 @@ function copyEnglish(): void {
       >
         <ImageUploader
           :model-value="modelValue.image"
+          :image-ref="modelValue.imageRef ?? null"
           :error="errors.image"
           :quality="imageQuality ?? IMAGE_QUALITY.default"
           @update:model-value="updateField('image', $event)"
+          @update:image-ref="updateField('imageRef', $event)"
         />
       </div>
 

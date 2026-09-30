@@ -1,10 +1,16 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
-import { Zone } from '@/models/Card'
-import { buildCardsCsv, parseCardsCsv, parseCardsCsvFile } from '@/services/csv/csvService'
+import { Zone, type Card } from '@/models/Card'
+import {
+  buildCardsCsv,
+  buildCardsCsvFilename,
+  downloadCardsCsv,
+  parseCardsCsv,
+  parseCardsCsvFile,
+} from '@/services/csv/csvService'
 
 const SAMPLE_CSV = readFileSync(resolve(process.cwd(), 'sample.csv'), 'utf8')
 
@@ -44,6 +50,9 @@ describe('parseCardsCsv', () => {
     expect(warrior.image).toMatch(/^data:image\/jpeg;base64,/)
     expect(tactician.image).toMatch(/^data:image\/jpeg;base64,/)
     expect(guardian.image).toMatch(/^data:image\/jpeg;base64,/)
+    expect(warrior.imageRef).toBe('img1.jpeg')
+    expect(tactician.imageRef).toBe('img2.jpeg')
+    expect(guardian.imageRef).toBe('img3.jpeg')
     expect(tactician).toMatchObject({ title: 'Tactician', zone: Zone.MIDFIELD, attack: 80, stars: 2 })
     expect(guardian).toMatchObject({
       title: 'Guardian',
@@ -89,6 +98,8 @@ describe('parseCardsCsv', () => {
     expect(result.ok).toBe(true)
     if (!result.ok) return
     expect(result.cards[0].translations).toEqual({})
+    expect(result.cards[0].image).toBeNull()
+    expect(result.cards[0].imageRef).toBeNull()
   })
 
   it('parses individual language columns and ignores unknown language suffixes', () => {
@@ -247,6 +258,7 @@ describe('parseCardsCsv', () => {
     expect(result.ok).toBe(true)
     if (!result.ok) return
     expect(result.cards[0].image).toBe(TINY_PNG_DATA_URL)
+    expect(result.cards[0].imageRef).toBe('my-art.png')
   })
 
   it('accepts a quoted data URL image and a missing optional subtitle', () => {
@@ -306,7 +318,13 @@ describe('buildCardsCsv', () => {
     expect(parsed.ok).toBe(true)
     if (!parsed.ok) return
 
-    const rebuilt = parseCardsCsv(buildCardsCsv(parsed.cards))
+    const rebuiltCsv = buildCardsCsv(parsed.cards)
+    expect(rebuiltCsv).toContain('img1.jpeg')
+    expect(rebuiltCsv).not.toContain('data:image')
+
+    const rebuilt = await parseCardsCsvFile(
+      new File([rebuiltCsv], 'rebuilt.csv', { type: 'text/csv' }),
+    )
 
     expect(rebuilt.ok).toBe(true)
     if (!rebuilt.ok) return
@@ -316,5 +334,101 @@ describe('buildCardsCsv', () => {
     expect(rebuilt.cards.map((card) => card.translations)).toEqual(
       parsed.cards.map((card) => card.translations),
     )
+    expect(rebuilt.cards.map((card) => card.imageRef)).toEqual(
+      parsed.cards.map((card) => card.imageRef),
+    )
+  })
+})
+
+describe('buildCardsCsvFilename', () => {
+  it('uses the card title for a single card and a date for several', async () => {
+    const parsed = await parseSample()
+    expect(parsed.ok).toBe(true)
+    if (!parsed.ok) return
+
+    const [warrior] = parsed.cards
+    expect(buildCardsCsvFilename([warrior])).toBe('warrior-card.csv')
+    expect(buildCardsCsvFilename(parsed.cards, new Date(2026, 0, 5))).toBe('cards-2026-01-05.csv')
+  })
+
+  it('falls back to "card" for an empty title', () => {
+    const card = { title: '***' } as Card
+    expect(buildCardsCsvFilename([card])).toBe('card-card.csv')
+  })
+})
+
+describe('downloadCardsCsv', () => {
+  it('downloads the collection as a UTF-8 CSV file with a BOM', async () => {
+    const parsed = await parseSample()
+    expect(parsed.ok).toBe(true)
+    if (!parsed.ok) return
+
+    const originalCreateObjectURL = URL.createObjectURL
+    const originalRevokeObjectURL = URL.revokeObjectURL
+    const blobs: Blob[] = []
+    const downloads: string[] = []
+
+    URL.createObjectURL = vi.fn((blob: Blob | MediaSource) => {
+      blobs.push(blob as Blob)
+      return `blob:csv-${blobs.length}`
+    })
+    URL.revokeObjectURL = vi.fn()
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
+      this: HTMLAnchorElement,
+    ) {
+      downloads.push(this.download)
+    })
+
+    try {
+      downloadCardsCsv(parsed.cards)
+
+      expect(blobs).toHaveLength(1)
+      expect(blobs[0].type).toBe('text/csv;charset=utf-8')
+      expect(downloads[0]).toMatch(/^cards-\d{4}-\d{2}-\d{2}\.csv$/)
+
+      const bytes = new Uint8Array(await blobs[0].arrayBuffer())
+      expect([bytes[0], bytes[1], bytes[2]]).toEqual([0xef, 0xbb, 0xbf])
+
+      const text = await blobs[0].text()
+      expect(text.startsWith('title,')).toBe(true)
+      expect(text).toContain('Warrior')
+      expect(text).toContain('title_pt')
+    } finally {
+      URL.createObjectURL = originalCreateObjectURL
+      URL.revokeObjectURL = originalRevokeObjectURL
+      vi.restoreAllMocks()
+    }
+  })
+
+  it('recovers image references from the local image library by data URL', async () => {
+    const parsed = await parseSample()
+    expect(parsed.ok).toBe(true)
+    if (!parsed.ok) return
+
+    const cards = parsed.cards.map((card) => ({ ...card, imageRef: null }))
+    const images = new Map([['img1.jpeg', parsed.cards[0].image as string]])
+
+    const originalCreateObjectURL = URL.createObjectURL
+    const originalRevokeObjectURL = URL.revokeObjectURL
+    const blobs: Blob[] = []
+
+    URL.createObjectURL = vi.fn((blob: Blob | MediaSource) => {
+      blobs.push(blob as Blob)
+      return 'blob:csv'
+    })
+    URL.revokeObjectURL = vi.fn()
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+
+    try {
+      downloadCardsCsv(cards, { images })
+
+      const text = await blobs[0].text()
+      expect(text).toContain('img1.jpeg')
+      expect(text).not.toContain('data:image')
+    } finally {
+      URL.createObjectURL = originalCreateObjectURL
+      URL.revokeObjectURL = originalRevokeObjectURL
+      vi.restoreAllMocks()
+    }
   })
 })

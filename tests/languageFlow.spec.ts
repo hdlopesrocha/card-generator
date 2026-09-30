@@ -74,7 +74,7 @@ describe('end-to-end language flow', () => {
       expect(card.translations?.PT?.title).toBeTruthy()
     }
 
-    const titles = wrapper.findAll('.card-list-item__title').map((node) => node.text())
+    const titles = wrapper.findAll('.card__title').map((node) => node.text())
     expect(titles.sort()).toEqual(['Guardião', 'Guerreiro', 'Tático'])
 
     // Editor preview for the Warrior

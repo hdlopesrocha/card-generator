@@ -62,7 +62,6 @@
   isolation: isolate;
   overflow: hidden;
   aspect-ratio: var(--card-aspect, 63 / 88);
-  border-radius: 4.2cqw;
   border: 1px solid rgba(255, 255, 255, 0.1);
   background:
     radial-gradient(

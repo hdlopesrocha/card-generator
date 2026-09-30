@@ -700,79 +700,50 @@ select.form-control {
 
 .card-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: var(--space-4);
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--space-5);
 }
 
 .card-list-item {
   display: flex;
-  gap: var(--space-4);
-  padding: var(--space-4);
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--color-border);
-  background: linear-gradient(180deg, var(--color-surface) 0%, var(--color-bg-elevated) 100%);
-  box-shadow: var(--shadow-sm);
-  transition:
-    transform 120ms ease,
-    border-color 120ms ease,
-    box-shadow 120ms ease;
-}
-
-.card-list-item:hover {
-  transform: translateY(-2px);
-  border-color: var(--color-border-strong);
-  box-shadow: var(--shadow-md);
-}
-
-.card-list-item__thumb {
-  flex: 0 0 auto;
-  width: 96px;
-  height: 134px;
-  border-radius: var(--radius-md);
-  overflow: hidden;
-  border: 1px solid var(--color-border-strong);
-  background:
-    linear-gradient(160deg, var(--thumb-from, var(--color-surface-3)) 0%, #05070d 100%);
-  display: grid;
-  place-items: center;
-}
-
-.card-list-item__thumb img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.card-list-item__thumb-initial {
-  font-family: var(--font-display);
-  font-size: 2.2rem;
-  font-weight: 800;
-  color: rgba(255, 255, 255, 0.22);
-}
-
-.card-list-item__body {
-  display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--space-3);
   min-width: 0;
-  flex: 1 1 auto;
 }
 
-.card-list-item__title {
-  font-size: 1.08rem;
-  overflow-wrap: anywhere;
+.card-list-item__preview {
+  display: flex;
+  justify-content: center;
+  filter: drop-shadow(0 14px 28px rgba(2, 6, 18, 0.45));
+  transition:
+    transform 140ms ease,
+    filter 140ms ease;
 }
 
-.card-list-item__subtitle {
-  font-size: 0.84rem;
-  color: var(--color-text-muted);
-  overflow-wrap: anywhere;
+.card-list-item:hover .card-list-item__preview,
+.card-list-item:focus-within .card-list-item__preview {
+  transform: translateY(-3px);
+  filter: drop-shadow(0 20px 34px rgba(2, 6, 18, 0.6));
 }
 
-.card-list-item__meta {
+.card-list-item__footer {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border-radius: var(--radius-md);
+  border: 1px solid
+    color-mix(in srgb, var(--zone-color, var(--color-border-strong)) 45%, var(--color-border));
+  background: linear-gradient(180deg, var(--color-surface) 0%, var(--color-bg-elevated) 100%);
+  box-shadow: var(--shadow-sm);
+}
+
+.card-list-item__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   gap: var(--space-2);
 }
 
@@ -789,19 +760,6 @@ select.form-control {
   color: var(--color-text-muted);
 }
 
-.stat-chip strong {
-  color: var(--color-text);
-  font-variant-numeric: tabular-nums;
-}
-
-.stat-chip--attack strong {
-  color: #ffb4ad;
-}
-
-.stat-chip--defense strong {
-  color: #a5c8ff;
-}
-
 .stat-chip--fallback {
   border-color: color-mix(in srgb, var(--color-warning) 55%, transparent);
   background: color-mix(in srgb, var(--color-warning) 14%, transparent);
@@ -809,35 +767,6 @@ select.form-control {
   font-weight: 700;
   letter-spacing: 0.08em;
   cursor: help;
-}
-
-.zone-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  padding: 0.2rem 0.6rem;
-  border-radius: var(--radius-pill);
-  border: 1px solid color-mix(in srgb, var(--zone-color) 60%, transparent);
-  background: color-mix(in srgb, var(--zone-color) 18%, transparent);
-  color: var(--color-text);
-  font-size: 0.72rem;
-  font-weight: 750;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-
-.zone-pill__dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--zone-color);
-}
-
-.card-list-item__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  margin-top: auto;
 }
 
 /* ------------------------------------------------------------------ */
@@ -1287,15 +1216,6 @@ select.form-control {
 
   .card-grid {
     grid-template-columns: minmax(0, 1fr);
-  }
-
-  .card-list-item {
-    flex-direction: column;
-  }
-
-  .card-list-item__thumb {
-    width: 100%;
-    height: 180px;
   }
 
   .page-title {

@@ -22,6 +22,7 @@ function makeCard(overrides: Partial<Card> = {}): Card {
     ...overrides,
     stars: overrides.stars ?? 2,
     translations: overrides.translations ?? {},
+    imageRef: overrides.imageRef ?? null,
   }
 }
 

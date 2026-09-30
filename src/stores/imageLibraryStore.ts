@@ -130,6 +130,45 @@ export const useImageLibraryStore = defineStore('images', () => {
     return { added, failed }
   }
 
+  /**
+   * Stores an already optimized image (for example from the card editor) and
+   * returns it with a unique file name. Cards use that name as their image
+   * reference so CSV exports keep file names instead of image data.
+   */
+  async function addProcessedImage(input: {
+    name: string
+    dataUrl: string
+    size: number
+  }): Promise<StoredImage | null> {
+    const languageStore = useLanguageStore()
+    error.value = null
+
+    try {
+      await loadImages()
+
+      const repository = getImageRepository()
+      const taken = new Set(images.value.map((image) => image.name.toLowerCase()))
+      const image: StoredImage = {
+        id: createImageId(),
+        name: uniqueName(input.name, taken),
+        dataUrl: input.dataUrl,
+        size: input.size,
+        createdAt: new Date().toISOString(),
+      }
+
+      await repository.put(image)
+      images.value = [...images.value, image]
+      return image
+    } catch (caught) {
+      console.error('Failed to store an image.', caught)
+      error.value =
+        caught instanceof StorageUnavailableError
+          ? languageStore.t('store.storageUnavailable')
+          : languageStore.t('store.imageSaveFailed')
+      return null
+    }
+  }
+
   async function deleteImage(id: string): Promise<boolean> {
     const languageStore = useLanguageStore()
     error.value = null
@@ -166,6 +205,7 @@ export const useImageLibraryStore = defineStore('images', () => {
     imagesByName,
     loadImages,
     addImages,
+    addProcessedImage,
     deleteImage,
     getImageById,
     clearError,

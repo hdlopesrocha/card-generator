@@ -110,6 +110,21 @@ describe('imageLibraryStore', () => {
     expect(store.imagesByName.has('art-1.png')).toBe(true)
   })
 
+  it('stores already processed images with unique names', async () => {
+    const store = useImageLibraryStore()
+    await store.loadImages()
+
+    const dataUrl = 'data:image/jpeg;base64,AAAA'
+    const first = await store.addProcessedImage({ name: 'art.png', dataUrl, size: 100 })
+    const second = await store.addProcessedImage({ name: 'art.png', dataUrl, size: 100 })
+
+    expect(first?.name).toBe('art.png')
+    expect(second?.name).toBe('art-1.png')
+    expect(store.imagesByName.get('art.png')).toBe(dataUrl)
+    expect(store.imagesByName.get('art-1.png')).toBe(dataUrl)
+    await expect(getImageRepository().count()).resolves.toBe(2)
+  })
+
   it('counts invalid files as failures and keeps the rest', async () => {
     const store = useImageLibraryStore()
     await store.loadImages()

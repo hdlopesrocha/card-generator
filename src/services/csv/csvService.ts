@@ -12,6 +12,7 @@ import { cardFromDraft, type Card, type CardDraft } from '@/models/Card'
 import { LANGUAGES, type Language } from '@/models/Language'
 import { resolveBundledImagesInText } from '@/services/image/bundledImages'
 import { validateCard } from '@/services/validation/cardValidation'
+import { formatDate, sanitizeFilename } from '@/utils/filename'
 
 export interface CsvParseFailure {
   ok: false
@@ -117,16 +118,19 @@ export function parseCardsCsv(
       }
     }
 
+    const image = resolveImage(get('image'), options.images)
+
     const draft: CardDraft = {
       title: get('title'),
       subtitle: get('subtitle'),
       attack: parseStat(get('attack')),
       defense: parseStat(get('defense')),
       action: get('action'),
-      image: resolveImage(get('image'), options.images),
+      image: image.dataUrl,
       zone: get('zone').toUpperCase() as CardDraft['zone'],
       stars: get('stars') === '' ? 1 : Number(get('stars')),
       translations,
+      imageRef: image.ref,
     }
 
     const errors = validateCard(draft, language)
@@ -204,7 +208,8 @@ export function buildCardsCsv(cards: Card[]): string {
       card.action,
       card.zone,
       card.stars,
-      card.image ?? '',
+      // Image URLs (file names) are exported; image data stays out of the CSV.
+      card.imageRef ?? '',
     ]
 
     for (const language of CSV_TRANSLATION_LANGUAGES) {
@@ -222,6 +227,73 @@ export function buildCardsCsv(cards: Card[]): string {
   return `${lines.join('\r\n')}\r\n`
 }
 
+/** Download name for an exported CSV: `<title>-card.csv` or `cards-YYYY-MM-DD.csv`. */
+export function buildCardsCsvFilename(cards: Card[], date: Date = new Date()): string {
+  if (cards.length === 1) {
+    return `${sanitizeFilename(cards[0].title || 'card')}-card.csv`
+  }
+
+  return `cards-${formatDate(date)}.csv`
+}
+
+/** Triggers a browser download of CSV text as a UTF-8 file. */
+export function downloadCsv(data: string, filename: string): void {
+  if (typeof document === 'undefined') return
+
+  const blob = new Blob([data], { type: 'text/csv;charset=utf-8' })
+  const objectUrl = URL.createObjectURL(blob)
+
+  const anchor = document.createElement('a')
+  anchor.href = objectUrl
+  anchor.download = filename
+  anchor.rel = 'noopener'
+  document.body.appendChild(anchor)
+  anchor.click()
+  anchor.remove()
+
+  URL.revokeObjectURL(objectUrl)
+}
+
+/**
+ * Exports the given cards as a downloadable CSV file.
+ *
+ * Images are exported as file-name references. Cards whose embedded image
+ * matches an entry of the provided image library get that file name even when
+ * the card was not originally created from a CSV reference.
+ */
+export function downloadCardsCsv(cards: Card[], options: CsvParseOptions = {}): void {
+  if (cards.length === 0) return
+
+  const enriched = withImageReferences(cards, options.images)
+
+  // A UTF-8 BOM helps spreadsheet applications detect the encoding.
+  downloadCsv(`\uFEFF${buildCardsCsv(enriched)}`, buildCardsCsvFilename(enriched))
+}
+
+function withImageReferences(cards: Card[], images?: ReadonlyMap<string, string>): Card[] {
+  if (!images || images.size === 0) return cards
+
+  const nameByDataUrl = new Map<string, string>()
+  for (const [name, dataUrl] of images) {
+    if (!nameByDataUrl.has(dataUrl)) {
+      nameByDataUrl.set(dataUrl, name)
+    }
+  }
+
+  let changed = false
+  const enriched = cards.map((card) => {
+    if (card.imageRef || !card.image) return card
+
+    const ref = nameByDataUrl.get(card.image)
+    if (!ref) return card
+
+    changed = true
+    return { ...card, imageRef: ref }
+  })
+
+  return changed ? enriched : cards
+}
+
 function parseStat(value: string): number {
   if (value === '') return Number.NaN
   return Number(value)
@@ -233,12 +305,19 @@ function parseStat(value: string): number {
  * provided map, and anything else is returned untouched so validation
  * reports the problem.
  */
-function resolveImage(value: string, images?: ReadonlyMap<string, string>): string | null {
-  if (value === '') return null
-  if (value.startsWith('data:image/')) return value
+function resolveImage(
+  value: string,
+  images?: ReadonlyMap<string, string>,
+): { dataUrl: string | null; ref: string | null } {
+  if (value === '') return { dataUrl: null, ref: null }
+  if (value.startsWith('data:image/')) return { dataUrl: value, ref: null }
 
   const name = value.split('/').pop()?.toLowerCase() ?? ''
-  return images?.get(name) ?? value
+  const dataUrl = images?.get(name)
+
+  if (dataUrl) return { dataUrl, ref: name }
+
+  return { dataUrl: value, ref: null }
 }
 
 function detectDelimiter(content: string): ',' | ';' {

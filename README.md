@@ -70,7 +70,7 @@ Runs the Vitest suite once (`vitest run`); `npm run test:watch` runs it in watch
 - `tests/imageLibrary.spec.ts` - `IndexedDbImageRepository` CRUD and the image library store: multi-upload, unique names, partial failures and deletion.
 - `tests/imageView.spec.ts` - the Images page: bundled sample listing, multi-file upload and confirmed deletion.
 - `tests/pdf.spec.ts` - valid non-empty PDF output with one page per card, exact card-size pages with no margins, custom dimensions, filename sanitization, the download flow and localized export (translated text rendered, English fallback).
-- `tests/csv.spec.ts` - CSV parsing: the bundled `sample.csv`, quoted fields, delimiters, BOM/CRLF, required columns, invalid row reporting, data URL and bundled-asset images, translations and CSV round-tripping.
+- `tests/csv.spec.ts` - CSV parsing and generation: the bundled `sample.csv`, quoted fields, delimiters, BOM/CRLF, required columns, invalid row reporting, data URL and bundled-asset images, translations, round-tripping and the downloadable CSV export.
 - `tests/localization.spec.ts` - message catalog completeness across all seven languages, `translate` interpolation and fallback, per-field English fallback in `getLocalizedCard`, language store persistence and invalid values, and demo card translations.
 - `tests/app.integration.spec.ts` - mounts the real views in jsdom: demo card seeding, live preview updates (title, action, zone themes), save validation, delete confirmation, export dialog selections and the CSV import/export flow.
 - `tests/languageFlow.spec.ts`, `tests/languageSwitching.spec.ts` - end-to-end language behavior: the picker updates cards live and list, editor preview and PDF all use the selected language.
@@ -95,7 +95,7 @@ card-generator/
 │   │   ├── AppNavigation.vue   Sidebar navigation
 │   │   ├── CardEditorForm.vue  Card form with language tabs and inline validation
 │   │   ├── CardImage.vue       Artwork renderer with placeholder fallback
-│   │   ├── CardListItem.vue    List entry with edit/preview/PDF/delete actions
+│   │   ├── CardListItem.vue    Full card preview with an action footer
 │   │   ├── CardPreview.vue     Full card design used by previews and export
 │   │   ├── CardStats.vue       Attack/defense stat panel
 │   │   ├── CardZoneBadge.vue   Zone label badge
@@ -202,6 +202,8 @@ The **Images** page (`/images`, `src/views/ImageView.vue`) manages the artwork a
 - **My images**: upload one or more PNG, JPEG or WebP files at once (5 MB each). Every file is validated with the same extension, MIME and magic-byte checks as card uploads, re-encoded to JPEG with the configured image quality, and stored in the IndexedDB `images` store through `IndexedDbImageRepository` (`src/services/storage/indexedDb.ts`, database `card-generator`, version 2).
 - Duplicate file names are made unique automatically (`art.png`, `art-1.png`, ...).
 - Each entry has a **Copy file name** button; uploaded entries can be deleted behind a confirmation dialog. Deleting an image only removes it from the library; cards already using it keep their own embedded copy.
+- The **Download all images (ZIP)** button (`jszip`, `src/services/image/zipService.ts`) downloads every bundled sample image and every uploaded image as one ZIP archive named `card-images-YYYY-MM-DD.zip`, so a CSV export and its images can travel together.
+- Images uploaded from the card editor are registered here automatically: the card stores the image data for rendering and the file name as its image reference, which is what CSV exports write.
 - CSV imports resolve the `image` column against both the bundled sample images and the local library, by file name (for example `img1.jpeg` or `hero.png`). The matched file is stored on the card as a data URL, so it survives backups and is embedded in PDFs.
 
 ## PDF generation
@@ -226,6 +228,7 @@ Available operations: export the current card (editor, preview page or list entr
 - Zone themes: ATTACK is red, MIDFIELD is green, DEFENSE is blue.
 - `src/config/zones.ts` centralizes the zone theme metadata: CSS class name, primary/accent colors, gradient endpoints, panel colors, text colors and badge colors. Localized zone labels and descriptions live in `src/config/languages.ts` (`ZONE_LABELS`, `getZoneLabel`). `src/styles/variables.css` defines the matching `--zone-*` CSS variables and `src/styles/card.css` maps them to the `.zone-attack`, `.zone-midfield` and `.zone-defense` classes used on the card root.
 - `CardPreview.vue` composes the card from reusable components (`CardImage`, `CardStats`, `CardZoneBadge`) and applies gradients, a textured background, decorative frame geometry, an artwork glow, stat panels, an action panel, a zone badge and a 1-3 star rating at the bottom of the card. The zone label is always rendered as text on the card, in the selected language.
+- The same `CardPreview` component is used everywhere the card appears: the Cards page grid, the editor's live preview and the full preview page, so the card list shows the exact printable design (including artwork) with its actions in a footer section directly below each card.
 - Adding a new zone touches three centralized places: `src/config/zones.ts`, `src/config/languages.ts` (zone labels) and `src/styles/variables.css` (plus the `Zone` enum and the matching `card.css` class); components and the PDF renderer read the shared configuration instead of hard-coding zone values.
 
 ## Languages
@@ -263,7 +266,7 @@ Because there is no backend, backups are the way to move a collection between br
 
 ## CSV import
 
-The Cards page has an **Import CSV & Export PDF** button: pick a CSV file, and the application validates every row, creates the cards in the local collection and immediately downloads a PDF with one card per page. The repository includes `sample.csv` with the three demo cards as a starting template, including the sample artwork from `src/assets` (`img1.jpeg`, `img2.jpeg`, `img3.jpeg`).
+The Cards page has an **Import CSV** button: pick a CSV file, and the application validates every row and creates the cards in the local collection. It does not trigger any export; use the PDF or CSV export buttons afterwards. The repository includes `sample.csv` with the three demo cards as a starting template, including the sample artwork from `src/assets` (`img1.jpeg`, `img2.jpeg`, `img3.jpeg`).
 
 CSV format (`src/services/csv/csvService.ts`):
 
@@ -276,6 +279,7 @@ CSV format (`src/services/csv/csvService.ts`):
 - Import is all-or-nothing: if any row is invalid, nothing is created and the UI lists the offending rows in the selected language (for example `Row 3: Attack must be a number between 0 and 999.` in English).
 - Translated text columns: for every non-English language add optional `title_<lang>`, `subtitle_<lang>` and `action_<lang>` columns, for example `title_pt`, `subtitle_pt`, `action_pt`, `title_fr`, `title_de`, `action_it`, and so on for `pt`, `fr`, `es`, `de`, `nl` and `it`. A language is imported when at least one of its three columns has a value; empty columns fall back to the English text. Translation lengths are validated with the same limits as the base fields.
 - The bundled `sample.csv` demonstrates the format with the three demo cards fully translated into all seven languages, so a CSV import immediately exports in any language.
+- The **Download CSV** button on the Cards page exports the current collection with the same format (including translations), using the same file naming as the PDF export (`<title>-card.csv` for one card, `cards-YYYY-MM-DD.csv` otherwise) and a UTF-8 BOM so spreadsheet applications detect the encoding. Images are exported by file name (never as base64 data); names are recovered from the bundled sample images or the local image library when a card only stores image data.
 
 ## Settings
 
