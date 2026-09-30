@@ -37,6 +37,24 @@ npm run preview
 
 Serves the generated `dist/` folder locally through Vite.
 
+## Deployment to GitHub Pages
+
+The project ships a deploy script that publishes the production build to the `gh-pages` branch:
+
+```bash
+npm run deploy
+```
+
+It runs `npm run build:pages`, which builds with the `/card-generator/` base path required by project pages, then copies `index.html` to `404.html` (so client-side routes survive a refresh) and adds `.nojekyll`, and finally pushes `dist/` to the `gh-pages` branch.
+
+One-time setup: in the repository on GitHub, open **Settings -> Pages -> Build and deployment**, choose **Deploy from a branch**, and select the `gh-pages` branch with the `/ (root)` folder. The app is then available at:
+
+```text
+https://<user>.github.io/<repository>/
+```
+
+If you host the build at a domain root instead (custom domain or user page), use `npm run build` and serve `dist/`.
+
 ## Tests
 
 ```bash
