@@ -1,9 +1,10 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import { DEMO_SEEDED_KEY } from '@/config/constants'
-import { createSampleCards } from '@/data/sampleCards'
+import { createSampleCards, createSampleCardsWithImages } from '@/data/sampleCards'
 import { cardFromDraft, createCardId } from '@/models/Card'
 import type { Card, CardDraft } from '@/models/Card'
+import { resolveBundledImage } from '@/services/image/bundledImages'
 import { getCardRepository, StorageUnavailableError } from '@/services/storage/indexedDb'
 import { validateCard } from '@/services/validation/cardValidation'
 import { useLanguageStore } from '@/stores/languageStore'
@@ -43,11 +44,12 @@ function describeFailure(caught: unknown, storageMessage: string, fallback: stri
 }
 
 /**
- * Upgrades demo cards stored by older versions (before translations existed)
- * by filling in the languages shipped with the app. Only pristine demo cards
- * are touched: once the user edits the English text, the card is left alone.
+ * Upgrades demo cards stored by older versions (before translations or demo
+ * artwork existed) by filling in the languages and image shipped with the
+ * app. Only pristine demo cards are touched: once the user edits the English
+ * text, the card is left alone.
  */
-function collectDemoUpgrades(loaded: Card[]): Card[] {
+async function collectDemoUpgrades(loaded: Card[]): Promise<Card[]> {
   const samples = new Map(createSampleCards().map((card) => [card.id, card]))
   const upgraded: Card[] = []
 
@@ -75,8 +77,24 @@ function collectDemoUpgrades(loaded: Card[]): Card[] {
       }
     }
 
+    let image = card.image
+    let imageRef = card.imageRef ?? null
+
+    if (!image && sample.imageRef) {
+      try {
+        const dataUrl = await resolveBundledImage(sample.imageRef)
+        if (dataUrl) {
+          image = dataUrl
+          imageRef = sample.imageRef
+          changed = true
+        }
+      } catch {
+        // Keep the card untouched when the artwork cannot be resolved.
+      }
+    }
+
     if (changed) {
-      upgraded.push({ ...card, translations })
+      upgraded.push({ ...card, translations, image, imageRef })
     }
   }
 
@@ -131,12 +149,12 @@ export const useCardStore = defineStore('cards', () => {
       const total = await repository.count()
 
       if (total === 0 && !wasDemoSeeded()) {
-        await repository.bulkPut(createSampleCards())
+        await repository.bulkPut(await createSampleCardsWithImages())
         markDemoSeeded()
       }
 
       const loaded = await repository.getAll()
-      const upgrades = collectDemoUpgrades(loaded)
+      const upgrades = await collectDemoUpgrades(loaded)
 
       if (upgrades.length > 0) {
         await repository.bulkPut(upgrades)
@@ -234,7 +252,7 @@ export const useCardStore = defineStore('cards', () => {
     try {
       const repository = getCardRepository()
       const existingIds = new Set(cards.value.map((card) => card.id))
-      const restored = createSampleCards().map((card) =>
+      const restored = (await createSampleCardsWithImages()).map((card) =>
         existingIds.has(card.id) ? { ...card, id: createCardId() } : card,
       )
 

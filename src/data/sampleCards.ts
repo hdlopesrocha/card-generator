@@ -1,4 +1,5 @@
 import { Zone, type Card } from '@/models/Card'
+import { resolveBundledImage } from '@/services/image/bundledImages'
 
 /**
  * Demo cards created on first launch so the three zone themes are visible
@@ -6,7 +7,7 @@ import { Zone, type Card } from '@/models/Card'
  *
  * English is stored on the base fields; every other supported language has a
  * complete translation so the language selector is demonstrative out of the
- * box.
+ * box. `imageRef` points at the artwork shipped in `src/assets`.
  */
 export function createSampleCards(): Card[] {
   return [
@@ -18,6 +19,7 @@ export function createSampleCards(): Card[] {
       defense: 90,
       action: 'Charge the nearest enemy and gain additional attack power.',
       image: null,
+      imageRef: 'img1.jpeg',
       zone: Zone.ATTACK,
       stars: 3,
       translations: {
@@ -64,6 +66,7 @@ export function createSampleCards(): Card[] {
       defense: 100,
       action: 'Increase the effectiveness of nearby allies.',
       image: null,
+      imageRef: 'img2.jpeg',
       zone: Zone.MIDFIELD,
       stars: 2,
       translations: {
@@ -107,6 +110,7 @@ export function createSampleCards(): Card[] {
       defense: 150,
       action: 'Protect an allied card from the next attack.',
       image: null,
+      imageRef: 'img3.jpeg',
       zone: Zone.DEFENSE,
       stars: 1,
       translations: {
@@ -143,4 +147,25 @@ export function createSampleCards(): Card[] {
       },
     },
   ]
+}
+
+/**
+ * Demo cards with their bundled artwork resolved into data URLs, ready to be
+ * stored. Used when seeding the first launch and when restoring demo cards.
+ */
+export async function createSampleCardsWithImages(): Promise<Card[]> {
+  const cards = createSampleCards()
+
+  return Promise.all(
+    cards.map(async (card) => {
+      if (!card.imageRef) return card
+
+      try {
+        const image = await resolveBundledImage(card.imageRef)
+        return image ? { ...card, image } : card
+      } catch {
+        return card
+      }
+    }),
+  )
 }

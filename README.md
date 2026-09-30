@@ -76,7 +76,7 @@ Runs the Vitest suite once (`vitest run`); `npm run test:watch` runs it in watch
 - `tests/languageFlow.spec.ts`, `tests/languageSwitching.spec.ts` - end-to-end language behavior: the picker updates cards live and list, editor preview and PDF all use the selected language.
 - `tests/selectedLanguageEditing.spec.ts` - creating and saving a card written only in the selected (non-English) language.
 - `tests/csvLanguageFlow.spec.ts`, `tests/csvImages.spec.ts` - importing `sample.csv` through the UI with translations and bundled artwork, then exporting a PDF in the selected language.
-- `tests/demoMigration.spec.ts` - legacy demo cards stored before translations existed are upgraded in place.
+- `tests/demoMigration.spec.ts` - demo seeding includes bundled artwork; legacy demo cards stored before translations/artwork existed are upgraded in place.
 
 ## Project structure
 
@@ -111,7 +111,7 @@ card-generator/
 │   │   ├── languages.ts        Localized UI messages, card labels and zone labels
 │   │   └── zones.ts            Centralized zone theme metadata and colors
 │   ├── data/
-│   │   └── sampleCards.ts      Demo cards with translations for every language
+│   │   └── sampleCards.ts      Demo cards with artwork and translations for every language
 │   ├── models/
 │   │   ├── Card.ts             Card interface, Zone enum, translations and helpers
 │   │   └── Language.ts         Supported language codes, names and defaults
@@ -147,7 +147,7 @@ card-generator/
     ├── csv.spec.ts             CSV parsing and generation tests
     ├── csvImages.spec.ts       Bundled sample artwork import and PDF embedding
     ├── csvLanguageFlow.spec.ts UI CSV import with translations and language-specific PDF
-    ├── demoMigration.spec.ts   Legacy demo card translation upgrade
+    ├── demoMigration.spec.ts   Legacy demo card translation and artwork upgrade
     ├── image.spec.ts           Image validation and detection tests
     ├── imageLibrary.spec.ts    Image repository and library store tests
     ├── imageView.spec.ts       Image page: sample listing, multi-upload and delete
@@ -180,7 +180,7 @@ Vue components  ->  Pinia stores  ->  services  ->  IndexedDB / PDF
 - IndexedDB is used instead of `localStorage` because card images are stored as base64 data URLs, which can exceed the roughly 5 MB `localStorage` quota; IndexedDB supports much larger structured data, asynchronous access and transactional writes (a failing `bulkPut` rolls back).
 - Cards survive page refreshes and browser restarts, and remain scoped to the browser and origin that created them.
 - Failures are surfaced as `StorageUnavailableError` or a friendly generic error; the stores present localized, readable messages (the raw storage error text is "Local storage is not available in this browser.") and log technical details to the console.
-- Demo cards are seeded on first launch: when the database is empty and the `card-generator:demo-seeded` flag is absent, the store writes `Warrior` (ATTACK), `Tactician` (MIDFIELD) and `Guardian` (DEFENSE) from `src/data/sampleCards.ts`. The demo cards are regular cards, include translations for all six non-English languages, and can be edited or deleted.
+- Demo cards are seeded on first launch: when the database is empty and the `card-generator:demo-seeded` flag is absent, the store writes `Warrior` (ATTACK), `Tactician` (MIDFIELD) and `Guardian` (DEFENSE) from `src/data/sampleCards.ts`. The demo cards are regular cards, include their bundled artwork (`img1-img3.jpeg`) and translations for all six non-English languages, and can be edited or deleted.
 
 ## Image handling
 
@@ -242,7 +242,7 @@ The application ships with seven languages: English (the default), Portuguese, F
 - The card editor shows one tab per language. The English tab edits the base fields; every other tab edits that language's title, subtitle and action, shows the English text as the placeholder for empty fields and offers a **Copy English text** button.
 - Validation follows the same fallback: while a non-English language is selected, a card can be created and saved using only that language's text. When saving, if the English base fields are still empty, the selected language's text is also stored as the base so the card renders completely in every language.
 - The card list marks cards without a translation for the selected language with a small `EN` chip explaining that English is being shown, so a missing translation is never mistaken for a bug.
-- The demo cards ship with all six translations, so switching the picker immediately shows localized cards. Demo cards stored by older versions (before translations existed) are upgraded in place on the next load when their text is still the original one.
+- The demo cards ship with their bundled artwork and all six translations, so a fresh install immediately shows complete, localized cards. Demo cards stored by older versions (before translations or artwork existed) are upgraded in place on the next load when their text is still the original one.
 
 ## Validation
 
