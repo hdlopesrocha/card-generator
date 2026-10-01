@@ -80,14 +80,16 @@ export const BUNDLED_CARD_FONTS: CardFontOption[] = Object.entries(fontModules)
   })
   .sort((a, b) => a.label.localeCompare(b.label))
 
+export type SystemFontPlatform = 'windows' | 'apple' | 'linux' | 'android' | 'unknown'
+
 /**
- * Common fonts shipped with (or available on) the major desktop and mobile
- * systems. Firefox, Safari and mobile browsers cannot enumerate local fonts,
- * so this static list is offered for everyone; selecting one shows it on
- * screen when installed.
+ * Common fonts shipped with (or available on) each platform. Firefox, Safari
+ * and mobile browsers cannot enumerate local fonts, so these static lists are
+ * used instead. Showing only the current platform's fonts keeps the picker
+ * useful: most of them are actually installed, unlike fonts from other
+ * systems, which the browser silently replaces with a substitute.
  */
-const SYSTEM_FONT_FAMILIES = [
-  // Windows
+const WINDOWS_FONT_FAMILIES = [
   'Arial',
   'Arial Black',
   'Bahnschrift',
@@ -114,7 +116,9 @@ const SYSTEM_FONT_FAMILIES = [
   'Times New Roman',
   'Trebuchet MS',
   'Verdana',
-  // macOS / iOS
+] as const
+
+const APPLE_FONT_FAMILIES = [
   'American Typewriter',
   'Apple Chancery',
   'Avenir',
@@ -146,7 +150,9 @@ const SYSTEM_FONT_FAMILIES = [
   'Snell Roundhand',
   'Times',
   'Zapfino',
-  // Linux
+] as const
+
+const LINUX_FONT_FAMILIES = [
   'Cantarell',
   'DejaVu Sans',
   'DejaVu Sans Mono',
@@ -164,7 +170,9 @@ const SYSTEM_FONT_FAMILIES = [
   'Oxygen',
   'Ubuntu',
   'Ubuntu Condensed',
-  // Android
+] as const
+
+const ANDROID_FONT_FAMILIES = [
   'Carrois Gothic',
   'Coming Soon',
   'Cutive Mono',
@@ -176,25 +184,101 @@ const SYSTEM_FONT_FAMILIES = [
   'Roboto Mono',
 ] as const
 
-const seenFamilies = new Set<string>()
+function dedupeFamilies(families: readonly string[]): string[] {
+  const seen = new Set<string>()
 
-export const SYSTEM_CARD_FONTS: CardFontOption[] = SYSTEM_FONT_FAMILIES.filter((family) => {
-  const key = family.toLowerCase()
-  if (seenFamilies.has(key)) return false
-  seenFamilies.add(key)
-  return true
-})
-  .map((family) => ({
+  return families.filter((family) => {
+    const key = family.toLowerCase()
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+}
+
+/** Every known system family, regardless of platform (id validation only). */
+export const ALL_SYSTEM_FONT_FAMILIES: string[] = dedupeFamilies([
+  ...WINDOWS_FONT_FAMILIES,
+  ...APPLE_FONT_FAMILIES,
+  ...LINUX_FONT_FAMILIES,
+  ...ANDROID_FONT_FAMILIES,
+])
+
+function currentPlatformName(): string {
+  if (typeof navigator === 'undefined') return ''
+
+  const uaData = (navigator as Navigator & { userAgentData?: { platform?: string } })
+    .userAgentData
+  return uaData?.platform ?? navigator.platform ?? ''
+}
+
+function currentUserAgent(): string {
+  return typeof navigator === 'undefined' ? '' : navigator.userAgent ?? ''
+}
+
+export function detectSystemFontPlatform(
+  platform: string = currentPlatformName(),
+  userAgent: string = currentUserAgent(),
+): SystemFontPlatform {
+  const name = platform.toLowerCase()
+  const ua = userAgent.toLowerCase()
+
+  if (name.includes('android') || ua.includes('android')) return 'android'
+  if (/iphone|ipad|ipod/.test(name) || /iphone|ipad|ipod/.test(ua)) return 'apple'
+  if (name.includes('mac') || ua.includes('macintosh') || ua.includes('mac os x')) return 'apple'
+  if (name.includes('win') || ua.includes('windows')) return 'windows'
+  if (
+    name.includes('linux') ||
+    name.includes('x11') ||
+    name.includes('cros') ||
+    name.includes('chrome os') ||
+    ua.includes('linux') ||
+    ua.includes('cros')
+  ) {
+    return 'linux'
+  }
+
+  return 'unknown'
+}
+
+export function systemFontFamiliesFor(platform: SystemFontPlatform): string[] {
+  switch (platform) {
+    case 'windows':
+      return dedupeFamilies(WINDOWS_FONT_FAMILIES)
+    case 'apple':
+      return dedupeFamilies(APPLE_FONT_FAMILIES)
+    case 'linux':
+      return dedupeFamilies(LINUX_FONT_FAMILIES)
+    case 'android':
+      return dedupeFamilies(ANDROID_FONT_FAMILIES)
+    default:
+      return ALL_SYSTEM_FONT_FAMILIES
+  }
+}
+
+function toSystemFontOption(family: string): CardFontOption {
+  return {
     id: `system:${family}`,
     label: family,
     kind: 'system' as const,
     family,
     lettersOnly: false,
-  }))
+  }
+}
+
+/** System fonts offered for the platform the app is running on. */
+export const SYSTEM_CARD_FONTS: CardFontOption[] = systemFontFamiliesFor(
+  detectSystemFontPlatform(),
+)
+  .map(toSystemFontOption)
   .sort((a, b) => a.label.localeCompare(b.label))
 
-/** Bundled fonts first, then the common system fonts. */
+const ALL_SYSTEM_CARD_FONTS = ALL_SYSTEM_FONT_FAMILIES.map(toSystemFontOption)
+
+/** Bundled fonts first, then the platform's system fonts. */
 export const CARD_FONTS: CardFontOption[] = [...BUNDLED_CARD_FONTS, ...SYSTEM_CARD_FONTS]
+
+/** Bundled fonts plus every known system font, used to validate ids. */
+const KNOWN_CARD_FONTS: CardFontOption[] = [...BUNDLED_CARD_FONTS, ...ALL_SYSTEM_CARD_FONTS]
 
 export const DEFAULT_CARD_FONT_ID = (
   BUNDLED_CARD_FONTS.find((font) => font.id === 'GameOnlineDemoRegular') ??
@@ -202,9 +286,9 @@ export const DEFAULT_CARD_FONT_ID = (
 )?.id ?? ''
 
 export function isCardFontId(value: unknown): value is string {
-  return typeof value === 'string' && CARD_FONTS.some((font) => font.id === value)
+  return typeof value === 'string' && KNOWN_CARD_FONTS.some((font) => font.id === value)
 }
 
 export function getCardFont(id: string): CardFontOption | undefined {
-  return CARD_FONTS.find((font) => font.id === id)
+  return KNOWN_CARD_FONTS.find((font) => font.id === id)
 }

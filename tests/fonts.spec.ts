@@ -7,12 +7,15 @@ import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
 import {
+  ALL_SYSTEM_FONT_FAMILIES,
   CARD_FONTS,
   BUNDLED_CARD_FONTS,
   SYSTEM_CARD_FONTS,
   DEFAULT_CARD_FONT_ID,
+  detectSystemFontPlatform,
   getCardFont,
   isCardFontId,
+  systemFontFamiliesFor,
 } from '@/config/fonts'
 import { cardFontFamily } from '@/services/fonts/webFonts'
 import { STORAGE_KEYS } from '@/config/constants'
@@ -29,21 +32,41 @@ describe('card font registry', () => {
     )
   })
 
-  it('lists the common system fonts after the bundled ones', () => {
-    expect(SYSTEM_CARD_FONTS.length).toBeGreaterThanOrEqual(40)
+  it('lists the platform system fonts after the bundled ones', () => {
+    expect(ALL_SYSTEM_FONT_FAMILIES.length).toBeGreaterThanOrEqual(40)
+    expect(SYSTEM_CARD_FONTS.length).toBeGreaterThan(0)
     expect(SYSTEM_CARD_FONTS.every((font) => font.kind === 'system')).toBe(true)
     expect(CARD_FONTS.slice(0, BUNDLED_CARD_FONTS.length)).toEqual(BUNDLED_CARD_FONTS)
     expect(CARD_FONTS.slice(BUNDLED_CARD_FONTS.length)).toEqual(SYSTEM_CARD_FONTS)
     expect(new Set(CARD_FONTS.map((font) => font.id)).size).toBe(CARD_FONTS.length)
   })
 
-  it('covers the major desktop and mobile platforms', () => {
-    const families = SYSTEM_CARD_FONTS.map((font) => font.family)
+  it('detects the platform from the browser data', () => {
+    expect(detectSystemFontPlatform('Win32', 'Mozilla/5.0 (Windows NT 10.0)')).toBe('windows')
+    expect(detectSystemFontPlatform('MacIntel', '')).toBe('apple')
+    expect(detectSystemFontPlatform('iPhone', '')).toBe('apple')
+    expect(detectSystemFontPlatform('Linux x86_64', 'Mozilla/5.0 (X11; Linux x86_64)')).toBe(
+      'linux',
+    )
+    expect(detectSystemFontPlatform('Linux armv8l', 'Mozilla/5.0 (Android 13)')).toBe('android')
+    expect(detectSystemFontPlatform('Chrome OS', '')).toBe('linux')
+    expect(detectSystemFontPlatform('', '')).toBe('unknown')
+  })
 
-    // Windows, macOS/iOS, Linux and Android representatives.
-    for (const family of ['Segoe UI', 'Helvetica Neue', 'DejaVu Sans', 'Roboto']) {
-      expect(families).toContain(family)
-    }
+  it('covers the major desktop and mobile platforms', () => {
+    expect(systemFontFamiliesFor('windows')).toContain('Segoe UI')
+    expect(systemFontFamiliesFor('apple')).toContain('Helvetica Neue')
+    expect(systemFontFamiliesFor('linux')).toContain('DejaVu Sans')
+    expect(systemFontFamiliesFor('android')).toContain('Roboto')
+    expect(systemFontFamiliesFor('unknown')).toEqual(ALL_SYSTEM_FONT_FAMILIES)
+  })
+
+  it('offers the detected platform system fonts in the picker', () => {
+    const expected = systemFontFamiliesFor(detectSystemFontPlatform()).sort((a, b) =>
+      a.localeCompare(b),
+    )
+
+    expect(SYSTEM_CARD_FONTS.map((font) => font.family)).toEqual(expected)
   })
 
   it('accepts system font ids', () => {
@@ -160,10 +183,11 @@ describe('cards page font dropdown', () => {
       .map((option) => option.attributes('value'))
     expect(values).toEqual(CARD_FONTS.map((font) => font.id))
 
-    await select.setValue('system:Roboto')
+    const systemId = SYSTEM_CARD_FONTS[0]!.id
+    await select.setValue(systemId)
     await nextTick()
 
     const settings = useSettingsStore()
-    expect(settings.cardFontId).toBe('system:Roboto')
+    expect(settings.cardFontId).toBe(systemId)
   })
 })
