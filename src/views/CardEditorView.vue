@@ -41,6 +41,7 @@ const previewCard = computed<Card>(() => ({
 const pdfOptions = computed(() => ({
   cardWidthMm: settings.cardWidthMm,
   cardHeightMm: settings.cardHeightMm,
+  fontId: settings.cardFontId,
 }))
 
 function setStatus(kind: 'success' | 'error', message: string): void {

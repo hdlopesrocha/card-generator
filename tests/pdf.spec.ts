@@ -1,4 +1,13 @@
-import { decodePDFRawStream, PDFDocument, PDFRawStream } from 'pdf-lib'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+
+import {
+  decodePDFRawStream,
+  PDFDocument,
+  PDFDict,
+  PDFName,
+  PDFRawStream,
+} from 'pdf-lib'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { Card } from '@/models/Card'
@@ -298,5 +307,67 @@ describe('downloadPdf', () => {
     expect(createdBlobs[0].size).toBeGreaterThan(0)
     expect(clickedDownloads).toEqual(['fire-drake-card.pdf'])
     expect(revokedUrls).toHaveLength(1)
+  })
+})
+
+describe('custom card font', () => {
+  /** Font subtypes used by the document (/Type0 = embedded TTF, /Type1 = standard). */
+  async function fontSubtypes(bytes: Uint8Array): Promise<string[]> {
+    const document = await PDFDocument.load(bytes)
+    const subtypes: string[] = []
+
+    for (const [, object] of document.context.enumerateIndirectObjects()) {
+      if (object instanceof PDFDict && object.get(PDFName.of('Type'))?.toString() === '/Font') {
+        subtypes.push(object.get(PDFName.of('Subtype'))?.toString() ?? '?')
+      }
+    }
+
+    return subtypes
+  }
+
+  it('embeds the selected card font alongside the standard fallback', async () => {
+    const fontBytes = readFileSync(
+      resolve(process.cwd(), 'src/assets/fonts/GameScoreDemoRegular.ttf'),
+    )
+    const fetchSpy = vi.fn(async () => new Response(fontBytes, { status: 200 }))
+    vi.stubGlobal('fetch', fetchSpy)
+
+    try {
+      const bytes = await generateCardPdf(makeCard({ title: 'Guerreiro', subtitle: 'Ação' }), {
+        fontId: 'GameScoreDemoRegular',
+      })
+      const subtypes = await fontSubtypes(bytes)
+
+      expect(pdfHeader(bytes)).toBe('%PDF-')
+      expect(fetchSpy).toHaveBeenCalled()
+      // /Type0 is the embedded card font, /Type1 the standard fallback used
+      // for digits, punctuation and accented characters.
+      expect(subtypes).toContain('/Type0')
+      expect(subtypes).toContain('/Type1')
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('falls back to the standard fonts when the card font cannot be loaded', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new Error('offline')
+      }),
+    )
+
+    try {
+      const bytes = await generateCardPdf(makeCard({ title: 'Warrior' }), {
+        fontId: 'GameScoreDemoRegular',
+      })
+      const subtypes = await fontSubtypes(bytes)
+
+      expect(pdfHeader(bytes)).toBe('%PDF-')
+      expect(subtypes).toContain('/Type1')
+      expect(subtypes).not.toContain('/Type0')
+    } finally {
+      vi.unstubAllGlobals()
+    }
   })
 })

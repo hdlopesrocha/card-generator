@@ -67,7 +67,7 @@
   box-shadow: var(--card-shadow);
   container-type: inline-size;
   color: var(--zone-color-ink);
-  font-family: var(--font-body);
+  font-family: var(--font-card);
   user-select: none;
 }
 
@@ -196,7 +196,7 @@
 
 .card__title {
   margin: 0;
-  font-family: var(--font-display);
+  font-family: var(--font-card);
   font-size: clamp(11px, 8.4cqw, 46px);
   font-weight: 800;
   line-height: 1.02;
@@ -308,7 +308,7 @@
 }
 
 .card__artwork-initial {
-  font-family: var(--font-display);
+  font-family: var(--font-card);
   font-size: 24cqw;
   font-weight: 800;
   line-height: 1;
@@ -386,7 +386,7 @@
 }
 
 .card-stat__value {
-  font-family: var(--font-display);
+  font-family: var(--font-card);
   font-size: 7.2cqw;
   font-weight: 800;
   line-height: 1.05;

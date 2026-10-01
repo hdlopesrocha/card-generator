@@ -70,6 +70,7 @@ Runs the Vitest suite once (`vitest run`); `npm run test:watch` runs it in watch
 - `tests/imageLibrary.spec.ts` - `IndexedDbImageRepository` CRUD and the image library store: multi-upload, unique names, partial failures and deletion.
 - `tests/imageView.spec.ts` - the Images page: bundled sample listing, multi-file upload and confirmed deletion.
 - `tests/pdf.spec.ts` - valid non-empty PDF output with one page per card, exact card-size pages with no margins, custom dimensions, filename sanitization, the download flow and localized export (translated text rendered, English fallback).
+- `tests/fonts.spec.ts` - card font registry discovery, letters-only demo detection, CSS font stack, settings store persistence and the Cards page dropdown.
 - `tests/csv.spec.ts` - CSV parsing and generation: the bundled `sample.csv`, quoted fields, delimiters, BOM/CRLF, required columns, invalid row reporting, data URL and bundled-asset images, translations, round-tripping and the downloadable CSV export.
 - `tests/localization.spec.ts` - message catalog completeness across all seven languages, `translate` interpolation and fallback, per-field English fallback in `getLocalizedCard`, language store persistence and invalid values, and demo card translations.
 - `tests/app.integration.spec.ts` - mounts the real views in jsdom: demo card seeding, live preview updates (title, action, zone themes), save validation, delete confirmation, export dialog selections and the CSV import/export flow.
@@ -105,9 +106,12 @@ card-generator/
 │   │   ├── ImageUploader.vue   Drag-and-drop image input
 │   │   ├── LanguageFlag.vue    Inline SVG flags for the language picker
 │   │   └── LanguagePicker.vue  Flag language selector shown in the app header
-│   ├── assets/                 Sample artwork used by CSV imports (img1-img3.jpeg)
+│   ├── assets/                 Sample artwork and card fonts
+│   │   ├── fonts/              Selectable card fonts (.ttf/.otf/.woff/.woff2)
+│   │   └── img1-img3.jpeg      Sample artwork used by CSV imports
 │   ├── config/
 │   │   ├── constants.ts        Validation limits, image, PDF, storage and backup constants
+│   │   ├── fonts.ts            Card font registry (auto-discovers assets/fonts)
 │   │   ├── languages.ts        Localized UI messages, card labels and zone labels
 │   │   └── zones.ts            Centralized zone theme metadata and colors
 │   ├── data/
@@ -122,6 +126,7 @@ card-generator/
 │   │   ├── csv/csvService.ts                 CSV parsing, row validation and generation
 │   │   ├── image/bundledImages.ts            Lazy loader for sample artwork referenced by CSV
 │   │   ├── image/imageService.ts             Image validation and JPEG re-encoding
+│   │   ├── fonts/webFonts.ts                 Runtime @font-face registration for card fonts
 │   │   ├── localization/cardLocalization.ts  Per-language card text with English fallback
 │   │   ├── pdf/cardPdfService.ts             In-browser PDF renderer (pdf-lib)
 │   │   ├── storage/indexedDb.ts              IndexedDB repositories (cards and images)
@@ -214,7 +219,7 @@ PDFs are generated fully in the browser with `pdf-lib`; no screenshots or canvas
 - One card per page: exporting N cards produces an N-page document. Each page is the card itself, so the artwork fills the page edge to edge (full bleed) with no margins, gaps or rounded outer corners.
 - Physical dimensions are configurable in Settings and used for both the on-screen aspect ratio and the PDF page size.
 - Every visual element is drawn: white card stock, the coloured zone frame (gradient, glow, border and corner accents), zone badge, title and subtitle, artwork (cover-fitted and clipped to rounded corners), attack/defense panels, the action panel and the 1-3 star rating at the bottom. Colors come from `src/config/zones.ts`, so the web preview and the PDF stay consistent.
-- The PDF is rendered in the language selected in the header (English by default): translated title, subtitle and action are resolved with English fallback, and the zone badge, Attack/Defense stat labels, Action heading, "No artwork" and "Untitled Card" labels are localized too. The embedded standard Helvetica fonts use WinAnsi encoding, so accented Latin characters such as `ç`, `ã`, `é`, `ñ` or `ü` are exported correctly.
+- The PDF is rendered in the language selected in the header (English by default): translated title, subtitle and action are resolved with English fallback, and the zone badge, Attack/Defense stat labels, Action heading, "No artwork" and "Untitled Card" labels are localized too. The selected card font (see Card fonts) is embedded for letters, while digits, punctuation and accented characters use the standard Helvetica fallback, so text such as `ç`, `ã`, `é`, `ñ` or `ü` is exported correctly.
 - Titles shrink and wrap up to two lines with ellipsis, and the action text wraps and adjusts its font size (down to 4.5 pt) to fit. Characters that `pdf-lib` cannot encode are replaced with `?`.
 - Artwork is embedded as PNG or JPEG from the stored data URL. WebP data URLs (only possible through imported backups) and corrupt payloads fall back to the placeholder instead of breaking the export.
 - Filenames are sanitized (`sanitizeFilename`): lowercase, non-alphanumeric characters collapsed to `-`, trimmed to 80 characters, with `card` as fallback. Single-card exports use the stored card title (`<title>-card.pdf`, for example `fire-drake-card.pdf`; the base title is used even when exporting in another language); multi-card exports use `cards-YYYY-MM-DD.pdf`.
@@ -231,6 +236,16 @@ Available operations: export the current card (editor, preview page or list entr
 - `CardPreview` always derives its aspect ratio from the configured physical card size (`settings.cardAspectRatio`), so the on-screen card and the PDF can never drift apart; the Cards page, editor preview and preview page all pass through the same component.
 - The same `CardPreview` component is used everywhere the card appears: the Cards page grid, the editor's live preview and the full preview page, so the card list shows the exact printable design (including artwork) with its actions in a footer section directly below each card.
 - Adding a new zone touches three centralized places: `src/config/zones.ts`, `src/config/languages.ts` (zone labels) and `src/styles/variables.css` (plus the `Zone` enum and the matching `card.css` class); components and the PDF renderer read the shared configuration instead of hard-coding zone values.
+
+## Card fonts
+
+Every font file placed in `src/assets/fonts` (`.ttf`, `.otf`, `.woff` or `.woff2`) is discovered automatically by `src/config/fonts.ts` and can be chosen from the **Card font** dropdown in the Cards page header:
+
+- The web card registers each font at runtime as an `@font-face` rule (`src/services/fonts/webFonts.ts`) and applies the selection through the `--font-card` CSS variable, so the Cards page, editor preview and preview page all use it.
+- The PDF renderer embeds the same selected font with `pdf-lib` and fontkit, so screen and print always match. When the font cannot be loaded, the export silently falls back to the standard fonts.
+- Fonts whose file name contains "demo" (and any font missing a glyph) are treated as *letters-only*: A-Z/a-z use the selected font while digits, punctuation and accented letters use the readable fallback font. This keeps the stats (`120`, `90`) and localized text clean even with watermarked demo/trial fonts.
+- The default font is `GameOnlineDemoRegular`. Removing a font file from the folder removes it from the dropdown on the next build.
+- System fonts installed on the machine are intentionally not listed: browsers cannot enumerate them and `pdf-lib` needs the actual font program to embed, so only bundled fonts can appear on screen and in the PDF.
 
 ## Languages
 
@@ -289,6 +304,8 @@ The Settings page stores preferences in `localStorage` under `card-generator:set
 - Physical card width and height in millimetres (default 63 x 88 mm, clamped to 40-110 mm and 56-154 mm). The PDF page size equals these dimensions.
 - Image quality for future uploads (0.5-1.0, shown as a percentage).
 - Reset settings to defaults, restore the demo cards (existing ids get a fresh copy), export/import a JSON backup and delete all local cards behind a confirmation dialog.
+
+The card font is not one of these settings: it is chosen from the picker in the Cards page header and persisted in the same settings object, as described in the Card fonts section.
 
 Settings are validated and clamped when read, so corrupted stored values fall back to defaults.
 

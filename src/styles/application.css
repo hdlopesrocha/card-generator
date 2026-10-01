@@ -295,6 +295,17 @@ a:hover {
   gap: var(--space-3);
 }
 
+.card-font-picker {
+  display: inline-flex;
+}
+
+.card-font-picker__select {
+  width: auto;
+  padding: 0.55rem 0.7rem;
+  font-size: 0.86rem;
+  font-weight: 650;
+}
+
 /* ------------------------------------------------------------------ */
 /* Panels                                                              */
 /* ------------------------------------------------------------------ */

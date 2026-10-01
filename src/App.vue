@@ -1,13 +1,28 @@
 <script setup lang="ts">
+import { computed, onMounted } from 'vue'
+
 import AppNavigation from '@/components/AppNavigation.vue'
 import LanguagePicker from '@/components/LanguagePicker.vue'
+import { cardFontFamily, ensureCardFontFaces } from '@/services/fonts/webFonts'
 import { useLanguageStore } from '@/stores/languageStore'
+import { useSettingsStore } from '@/stores/settingsStore'
 
 const languageStore = useLanguageStore()
+const settings = useSettingsStore()
+
+ensureCardFontFaces()
+
+onMounted(() => {
+  ensureCardFontFaces()
+})
+
+const shellStyle = computed(() => ({
+  '--font-card': cardFontFamily(settings.cardFontId),
+}))
 </script>
 
 <template>
-  <div class="app-shell">
+  <div class="app-shell" :style="shellStyle">
     <a class="skip-link" href="#main-content">{{ languageStore.t('app.skipToContent') }}</a>
 
     <header class="app-shell__header">

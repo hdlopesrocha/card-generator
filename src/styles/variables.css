@@ -3,6 +3,9 @@
  *
  * Zone colours are defined once here and mirrored in `src/config/zones.ts`
  * (used by the PDF renderer, which cannot read CSS). Keep both in sync.
+ *
+ * Card font faces are registered at runtime by
+ * `src/services/fonts/webFonts.ts` from the files in `src/assets/fonts`.
  */
 
 :root {
@@ -14,6 +17,8 @@
   --font-body: 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial,
     sans-serif;
   --font-mono: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+  --font-card: 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial,
+    sans-serif;
 
   /* Spacing scale */
   --space-1: 0.25rem;

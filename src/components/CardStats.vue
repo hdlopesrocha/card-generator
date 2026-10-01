@@ -21,15 +21,18 @@ withDefaults(
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
-          stroke-width="2"
+          stroke-width="1.8"
           stroke-linecap="round"
           stroke-linejoin="round"
           aria-hidden="true"
         >
-          <path d="M14.5 17.5 3 6V3h3l11.5 11.5" />
-          <path d="m13 19 6-6" />
-          <path d="m16 16 4 4" />
-          <path d="m19 21 2-2" />
+          <circle cx="12" cy="12" r="10" />
+          <path d="M12 7.8 15.99 10.7 14.47 15.4H9.53L8.01 10.7Z" />
+          <path d="M12 2v5.8" />
+          <path d="m21.51 8.91-5.52 1.79" />
+          <path d="m17.88 20.09-3.41-4.69" />
+          <path d="m6.12 20.09 3.41-4.69" />
+          <path d="m2.49 8.91 5.52 1.79" />
         </svg>
       </span>
       <span class="card-stat__body">

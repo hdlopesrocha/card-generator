@@ -5,6 +5,7 @@ import CardListItem from '@/components/CardListItem.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import ExportDialog from '@/components/ExportDialog.vue'
+import { CARD_FONTS } from '@/config/fonts'
 import type { Card } from '@/models/Card'
 import { parseCardsCsvFile, downloadCardsCsv } from '@/services/csv/csvService'
 import { resolveAllBundledImages } from '@/services/image/bundledImages'
@@ -35,6 +36,7 @@ const clearingAll = ref(false)
 const pdfOptions = computed(() => ({
   cardWidthMm: settings.cardWidthMm,
   cardHeightMm: settings.cardHeightMm,
+  fontId: settings.cardFontId,
 }))
 
 const cardCountText = computed(() =>
@@ -197,6 +199,11 @@ function openCsvPicker(): void {
   csvInput.value?.click()
 }
 
+function handleFontChange(event: Event): void {
+  const target = event.target as HTMLSelectElement
+  settings.setCardFont(target.value)
+}
+
 async function handleCsvImport(event: Event): Promise<void> {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
@@ -243,6 +250,21 @@ async function handleCsvImport(event: Event): Promise<void> {
       </div>
 
       <div class="page-actions">
+        <label class="card-font-picker">
+          <span class="visually-hidden">{{ t('settings.cardFont') }}</span>
+          <select
+            id="cards-card-font"
+            class="form-control card-font-picker__select"
+            :value="settings.cardFontId"
+            :aria-label="t('settings.cardFont')"
+            @change="handleFontChange"
+          >
+            <option v-for="font in CARD_FONTS" :key="font.id" :value="font.id">
+              {{ font.label }}
+            </option>
+          </select>
+        </label>
+
         <RouterLink class="btn btn--primary" to="/cards/new">
           {{ t('cards.createNew') }}
         </RouterLink>

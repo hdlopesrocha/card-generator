@@ -1,17 +1,21 @@
 import { computed, ref, watch } from 'vue'
 import { defineStore } from 'pinia'
+
 import { IMAGE_QUALITY, PDF_CONSTANTS, STORAGE_KEYS } from '@/config/constants'
+import { DEFAULT_CARD_FONT_ID, isCardFontId } from '@/config/fonts'
 
 export interface AppSettings {
   cardWidthMm: number
   cardHeightMm: number
   imageQuality: number
+  cardFontId: string
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
   cardWidthMm: PDF_CONSTANTS.cardWidthMm,
   cardHeightMm: PDF_CONSTANTS.cardHeightMm,
   imageQuality: IMAGE_QUALITY.default,
+  cardFontId: DEFAULT_CARD_FONT_ID,
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -63,6 +67,10 @@ function readStoredSettings(): Partial<AppSettings> {
       settings.imageQuality = clamp(parsed.imageQuality, IMAGE_QUALITY.min, IMAGE_QUALITY.max)
     }
 
+    if (isCardFontId(parsed.cardFontId)) {
+      settings.cardFontId = parsed.cardFontId
+    }
+
     return settings
   } catch {
     return {}
@@ -75,6 +83,7 @@ export const useSettingsStore = defineStore('settings', () => {
   const cardWidthMm = ref<number>(stored.cardWidthMm ?? DEFAULT_SETTINGS.cardWidthMm)
   const cardHeightMm = ref<number>(stored.cardHeightMm ?? DEFAULT_SETTINGS.cardHeightMm)
   const imageQuality = ref<number>(stored.imageQuality ?? DEFAULT_SETTINGS.imageQuality)
+  const cardFontId = ref<string>(stored.cardFontId ?? DEFAULT_SETTINGS.cardFontId)
 
   const cardAspectRatio = computed(() => `${cardWidthMm.value} / ${cardHeightMm.value}`)
 
@@ -86,6 +95,7 @@ export const useSettingsStore = defineStore('settings', () => {
       cardWidthMm: cardWidthMm.value,
       cardHeightMm: cardHeightMm.value,
       imageQuality: imageQuality.value,
+      cardFontId: cardFontId.value,
     }
 
     try {
@@ -119,21 +129,30 @@ export const useSettingsStore = defineStore('settings', () => {
     }
   }
 
+  function setCardFont(id: string): void {
+    if (isCardFontId(id)) {
+      cardFontId.value = id
+    }
+  }
+
   function resetToDefaults(): void {
     cardWidthMm.value = DEFAULT_SETTINGS.cardWidthMm
     cardHeightMm.value = DEFAULT_SETTINGS.cardHeightMm
     imageQuality.value = DEFAULT_SETTINGS.imageQuality
+    cardFontId.value = DEFAULT_SETTINGS.cardFontId
   }
 
-  watch([cardWidthMm, cardHeightMm, imageQuality], persist)
+  watch([cardWidthMm, cardHeightMm, imageQuality, cardFontId], persist)
 
   return {
     cardWidthMm,
     cardHeightMm,
     imageQuality,
+    cardFontId,
     cardAspectRatio,
     setCardDimensions,
     setImageQuality,
+    setCardFont,
     resetToDefaults,
   }
 })

@@ -30,8 +30,10 @@ import {
   type RGB,
   StandardFonts,
 } from 'pdf-lib'
+import fontkit from '@pdf-lib/fontkit'
 
 import { PDF_CONSTANTS } from '@/config/constants'
+import { getCardFont } from '@/config/fonts'
 import { getCardTextLabels, getZoneLabel, translate, type CardTextLabels } from '@/config/languages'
 import { getZoneTheme, type ZoneTheme } from '@/config/zones'
 import type { Card } from '@/models/Card'
@@ -43,11 +45,12 @@ import { formatDate, sanitizeFilename } from '@/utils/filename'
 
 export { sanitizeFilename }
 
-/** Optional physical dimensions and content language for the generated PDF. */
+/** Optional physical dimensions, content language and card font for the PDF. */
 export interface PdfGenerationOptions {
   cardWidthMm?: number
   cardHeightMm?: number
   language?: Language
+  fontId?: string
 }
 
 /* ------------------------------------------------------------------ */
@@ -75,7 +78,7 @@ export async function generateCardsPdf(
   const cardHeight = resolveMm(options.cardHeightMm, PDF_CONSTANTS.cardHeightMm) * MM_TO_PT
 
   const document = await PDFDocument.create()
-  const fonts = await embedStandardFonts(document)
+  const fonts = await embedCardFonts(document, options.fontId)
 
   for (const card of cards) {
     const localizedCard = getLocalizedCard(card, language)
@@ -218,10 +221,95 @@ const WORST_CONTENT_RATIO =
 /* Drawing primitives                                                  */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Text font that can mix the selected card font with a standard fallback.
+ *
+ * Demo fonts only contain usable glyphs for letters, so digits, punctuation
+ * and accented characters are drawn with the fallback font while letters keep
+ * the card font. When `lettersOnly` is false the primary font handles
+ * everything.
+ */
+class CardTextFont {
+  private readonly supportedCodePoints: Set<number> | null
+
+  constructor(
+    private readonly primary: PDFFont | null,
+    private readonly fallback: PDFFont,
+    private readonly lettersOnly: boolean,
+  ) {
+    this.supportedCodePoints = primary
+      ? new Set(primary.getCharacterSet())
+      : null
+  }
+
+  /** The standard font used for characters the primary font does not cover. */
+  get fallbackFont(): PDFFont {
+    return this.fallback
+  }
+
+  private fontFor(char: string): PDFFont {
+    if (!this.primary) return this.fallback
+    if (this.lettersOnly && !/[A-Za-z]/.test(char)) return this.fallback
+    if (!this.supportedCodePoints?.has(char.codePointAt(0) ?? 0)) return this.fallback
+    return this.primary
+  }
+
+  private runs(text: string): Array<{ font: PDFFont; text: string }> {
+    const runs: Array<{ font: PDFFont; text: string }> = []
+
+    for (const char of text) {
+      const font = this.fontFor(char)
+      const last = runs[runs.length - 1]
+      if (last && last.font === font) {
+        last.text += char
+      } else {
+        runs.push({ font, text: char })
+      }
+    }
+
+    return runs
+  }
+
+  widthOfTextAtSize(text: string, size: number): number {
+    return this.runs(text).reduce((sum, run) => sum + run.font.widthOfTextAtSize(run.text, size), 0)
+  }
+
+  canEncode(text: string): boolean {
+    try {
+      for (const run of this.runs(text)) {
+        run.font.encodeText(run.text)
+      }
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  draw(
+    page: PDFPage,
+    text: string,
+    options: { x: number; y: number; size: number; color: RGB; opacity?: number },
+  ): void {
+    let cursor = options.x
+
+    for (const run of this.runs(text)) {
+      page.drawText(run.text, {
+        x: cursor,
+        y: options.y,
+        size: options.size,
+        font: run.font,
+        color: options.color,
+        opacity: options.opacity,
+      })
+      cursor += run.font.widthOfTextAtSize(run.text, options.size)
+    }
+  }
+}
+
 interface EmbeddedFonts {
-  regular: PDFFont
-  bold: PDFFont
-  oblique: PDFFont
+  regular: CardTextFont
+  bold: CardTextFont
+  oblique: CardTextFont
 }
 
 interface CardRenderContext {
@@ -256,7 +344,49 @@ async function embedStandardFonts(document: PDFDocument): Promise<EmbeddedFonts>
     document.embedFont(StandardFonts.HelveticaBold),
     document.embedFont(StandardFonts.HelveticaOblique),
   ])
-  return { regular, bold, oblique }
+
+  return {
+    regular: new CardTextFont(null, regular, false),
+    bold: new CardTextFont(null, bold, false),
+    oblique: new CardTextFont(null, oblique, false),
+  }
+}
+
+let hasWarnedAboutCardFont = false
+
+/**
+ * Embeds the selected card font for all card text. Demo fonts are limited to
+ * letters with every other character falling back to the standard fonts.
+ * Falls back entirely to the standard fonts when the file cannot be loaded,
+ * so PDF generation never fails because of typography.
+ */
+async function embedCardFonts(document: PDFDocument, fontId?: string): Promise<EmbeddedFonts> {
+  const standard = await embedStandardFonts(document)
+  const option = getCardFont(fontId ?? '')
+
+  if (!option) return standard
+
+  try {
+    const response = await fetch(option.url)
+    if (!response.ok) throw new Error(`HTTP ${response.status}`)
+
+    const bytes = await response.arrayBuffer()
+    document.registerFontkit(fontkit)
+    const custom = await document.embedFont(bytes, { subset: true })
+
+    return {
+      regular: new CardTextFont(custom, standard.regular.fallbackFont, option.lettersOnly),
+      bold: new CardTextFont(custom, standard.bold.fallbackFont, option.lettersOnly),
+      oblique: new CardTextFont(custom, standard.oblique.fallbackFont, option.lettersOnly),
+    }
+  } catch {
+    if (!hasWarnedAboutCardFont) {
+      hasWarnedAboutCardFont = true
+      console.warn('The card font could not be embedded; using standard PDF fonts.')
+    }
+
+    return standard
+  }
 }
 
 async function embedArtwork(document: PDFDocument, card: Card): Promise<PDFImage | null> {
@@ -362,17 +492,12 @@ function popClip(page: PDFPage): void {
 /* Text helpers                                                        */
 /* ------------------------------------------------------------------ */
 
-function isEncodable(font: PDFFont, text: string): boolean {
-  try {
-    font.encodeText(text)
-    return true
-  } catch {
-    return false
-  }
+function isEncodable(font: CardTextFont, text: string): boolean {
+  return font.canEncode(text)
 }
 
-/** Replaces characters the standard fonts cannot encode (e.g. emoji). */
-function normalizeForFont(font: PDFFont, text: string): string {
+/** Replaces characters the fonts cannot encode (e.g. emoji). */
+function normalizeForFont(font: CardTextFont, text: string): string {
   if (isEncodable(font, text)) return text
 
   let result = ''
@@ -382,7 +507,7 @@ function normalizeForFont(font: PDFFont, text: string): string {
   return result
 }
 
-function measure(font: PDFFont, text: string, size: number): number {
+function measure(font: CardTextFont, text: string, size: number): number {
   if (!text) return 0
   try {
     return font.widthOfTextAtSize(text, size)
@@ -391,13 +516,13 @@ function measure(font: PDFFont, text: string, size: number): number {
   }
 }
 
-function trackedTextWidth(font: PDFFont, text: string, size: number, tracking: number): number {
+function trackedTextWidth(font: CardTextFont, text: string, size: number, tracking: number): number {
   if (!text) return 0
   return measure(font, text, size) + tracking * (text.length - 1)
 }
 
 /** Greedy word wrap with hard splitting for words wider than the box. */
-function wrapText(text: string, font: PDFFont, size: number, maxWidth: number): string[] {
+function wrapText(text: string, font: CardTextFont, size: number, maxWidth: number): string[] {
   const normalized = normalizeForFont(font, text).replace(/\s+/g, ' ').trim()
   if (!normalized) return []
 
@@ -438,7 +563,7 @@ function wrapText(text: string, font: PDFFont, size: number, maxWidth: number): 
   return lines
 }
 
-function ellipsize(text: string, font: PDFFont, size: number, maxWidth: number): string {
+function ellipsize(text: string, font: CardTextFont, size: number, maxWidth: number): string {
   if (!text) return ''
   if (measure(font, text, size) <= maxWidth) return text
 
@@ -457,7 +582,7 @@ function ellipsize(text: string, font: PDFFont, size: number, maxWidth: number):
 
 function fitTitle(
   text: string,
-  font: PDFFont,
+  font: CardTextFont,
   maxSize: number,
   maxWidth: number,
   maxLines: number,
@@ -485,7 +610,7 @@ function fitTitle(
 
 function fitActionLines(
   text: string,
-  font: PDFFont,
+  font: CardTextFont,
   maxWidth: number,
   maxHeight: number,
   maxSize: number,
@@ -511,13 +636,13 @@ function drawLocalText(
   text: string,
   x: number,
   top: number,
-  font: PDFFont,
+  font: CardTextFont,
   size: number,
   color: RGB,
   opacity = 1,
 ): void {
   const baseline = ctx.top - top - size * TEXT_ASCENT
-  ctx.page.drawText(text, { x: ctx.left + x, y: baseline, font, size, color, opacity })
+  font.draw(ctx.page, text, { x: ctx.left + x, y: baseline, size, color, opacity })
 }
 
 /** Draws letter-spaced text one glyph at a time, like the CSS tracking. */
@@ -526,7 +651,7 @@ function drawTrackedText(
   text: string,
   x: number,
   baselineY: number,
-  font: PDFFont,
+  font: CardTextFont,
   size: number,
   color: RGB,
   opacity: number,
@@ -534,7 +659,7 @@ function drawTrackedText(
 ): void {
   let cursor = ctx.left + x
   for (const char of text) {
-    ctx.page.drawText(char, { x: cursor, y: baselineY, size, font, color, opacity })
+    font.draw(ctx.page, char, { x: cursor, y: baselineY, size, color, opacity })
     cursor += measure(font, char, size) + tracking
   }
 }
@@ -978,7 +1103,7 @@ function drawZoneBadge(
   ctx: CardRenderContext,
   theme: ZoneTheme,
   box: Box,
-  font: PDFFont,
+  font: CardTextFont,
   label: string,
   fontSize: number,
   tracking: number,
@@ -1130,10 +1255,9 @@ function drawArtworkPlaceholder(
   const blockTop = box.y + (box.height - blockHeight) / 2
   const initialBaseline = ctx.top - blockTop - initialSize * TEXT_ASCENT
 
-  ctx.page.drawText(initialText, {
+  fonts.bold.draw(ctx.page, initialText, {
     x: ctx.left + box.x + (box.width - initialWidth) / 2,
     y: initialBaseline,
-    font: fonts.bold,
     size: initialSize,
     color: light,
     opacity: 0.22,
@@ -1247,16 +1371,39 @@ function drawStatIcon(
     ? parseColor(theme.accent).color
     : parseColor(theme.primaryLight).color
 
-  const path = attack
-    ? `M ${round(size * 0.5)} ${round(size * 0.1)} L ${round(size * 0.9)} ${round(size * 0.9)} ` +
-      `L ${round(size * 0.1)} ${round(size * 0.9)} Z`
-    : `M ${round(size * 0.5)} ${round(size * 0.08)} L ${round(size * 0.88)} ${round(size * 0.24)} ` +
+  if (!attack) {
+    const shield =
+      `M ${round(size * 0.5)} ${round(size * 0.08)} L ${round(size * 0.88)} ${round(size * 0.24)} ` +
       `V ${round(size * 0.52)} C ${round(size * 0.88)} ${round(size * 0.74)} ` +
       `${round(size * 0.7)} ${round(size * 0.88)} ${round(size * 0.5)} ${round(size * 0.92)} ` +
       `C ${round(size * 0.3)} ${round(size * 0.88)} ${round(size * 0.12)} ${round(size * 0.74)} ` +
       `${round(size * 0.12)} ${round(size * 0.52)} V ${round(size * 0.24)} Z`
+    ctx.page.drawSvgPath(shield, { x, y, color })
+    return
+  }
 
-  ctx.page.drawSvgPath(path, { x, y, color })
+  // Football (soccer ball), matching the web card icon (24 unit viewBox).
+  const scale = size / 24
+  const stroke = Math.max(0.5, 1.8 * scale)
+  const centerX = x + 12 * scale
+  const centerY = y - 12 * scale
+
+  ctx.page.drawEllipse({
+    x: centerX,
+    y: centerY,
+    xScale: 10 * scale,
+    yScale: 10 * scale,
+    borderColor: color,
+    borderWidth: stroke,
+  })
+
+  const pentagon = 'M 12 7.8 L 15.99 10.7 L 14.47 15.4 H 9.53 L 8.01 10.7 Z'
+  const seams =
+    'M 12 2 L 12 7.8 M 21.51 8.91 L 15.99 10.7 M 17.88 20.09 L 14.47 15.4 ' +
+    'M 6.12 20.09 L 9.53 15.4 M 2.49 8.91 L 8.01 10.7'
+
+  ctx.page.drawSvgPath(pentagon, { x, y, scale, borderColor: color, borderWidth: stroke })
+  ctx.page.drawSvgPath(seams, { x, y, scale, borderColor: color, borderWidth: stroke })
 }
 
 function drawAction(
