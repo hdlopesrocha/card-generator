@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import type { Card, CardDraft, CardTranslation, CardTranslations } from '@/models/Card'
 import { Zone } from '@/models/Card'
 import { getLanguageName, LANGUAGES } from '@/models/Language'
@@ -46,10 +46,24 @@ const languageStore = useLanguageStore()
 
 const isEnglish = computed(() => languageStore.language === 'EN')
 
+/**
+ * Local mirror of the draft. Components such as the image uploader send two
+ * updates in a row (image data and its file name); merging them here instead
+ * of spreading the still-stale prop keeps both values.
+ */
+const draft = ref<CardDraft>(props.modelValue)
+
+watch(
+  () => props.modelValue,
+  (value) => {
+    draft.value = value
+  },
+)
+
 /** Draft adapted to the card shape accepted by the localization helper. */
 const translationSource = computed<Card>(() => ({
-  ...props.modelValue,
-  id: props.modelValue.id ?? '',
+  ...draft.value,
+  id: draft.value.id ?? '',
 }))
 
 const currentTranslation = computed<CardTranslation>(() => {
@@ -70,7 +84,8 @@ const actionValue = computed(() =>
 const translationError = computed(() => props.errors.translations)
 
 function updateField<K extends keyof CardDraft>(key: K, value: CardDraft[K]): void {
-  emit('update:modelValue', { ...props.modelValue, [key]: value })
+  draft.value = { ...draft.value, [key]: value }
+  emit('update:modelValue', draft.value)
 }
 
 function updateTranslation(key: keyof CardTranslation, value: string): void {
@@ -84,10 +99,10 @@ function updateTranslation(key: keyof CardTranslation, value: string): void {
   const entry: CardTranslation = { ...currentTranslation.value }
   entry[key] = value
 
-  const translations: CardTranslations = { ...props.modelValue.translations }
+  const translations: CardTranslations = { ...draft.value.translations }
   translations[language] = entry
 
-  emit('update:modelValue', { ...props.modelValue, translations })
+  updateField('translations', translations)
 }
 
 function handleTextInput(key: 'title' | 'subtitle' | 'action', event: Event): void {
@@ -113,14 +128,14 @@ function copyEnglish(): void {
   const language = languageStore.language
   if (language === 'EN') return
 
-  const translations: CardTranslations = { ...props.modelValue.translations }
+  const translations: CardTranslations = { ...draft.value.translations }
   translations[language] = {
-    title: props.modelValue.title,
-    subtitle: props.modelValue.subtitle,
-    action: props.modelValue.action,
+    title: draft.value.title,
+    subtitle: draft.value.subtitle,
+    action: draft.value.action,
   }
 
-  emit('update:modelValue', { ...props.modelValue, translations })
+  updateField('translations', translations)
 }
 </script>
 
