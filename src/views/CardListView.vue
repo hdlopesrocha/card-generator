@@ -300,9 +300,6 @@ async function handleCsvImport(event: Event): Promise<void> {
         >
           {{ t('cards.exportCsv') }}
         </button>
-        <RouterLink class="btn btn--secondary" to="/settings">
-          {{ t('cards.backupImport') }}
-        </RouterLink>
         <button
           type="button"
           class="btn btn--danger"
