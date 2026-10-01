@@ -1,11 +1,15 @@
-import { createRouter, createWebHistory } from 'vue-router'
+import { createRouter, createWebHashHistory } from 'vue-router'
 
 /**
  * Client-side routes. Views are lazily loaded so the initial bundle only
  * contains the application shell and card list.
+ *
+ * Hash history is used so every route works when the app is served from a
+ * static host without rewrite rules (such as GitHub Pages), where an HTML5
+ * history deep link would return a 404 status even though the app loads.
  */
 const router = createRouter({
-  history: createWebHistory(import.meta.env.BASE_URL),
+  history: createWebHashHistory(import.meta.env.BASE_URL),
   routes: [
     { path: '/', redirect: '/cards' },
     {

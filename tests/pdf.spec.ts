@@ -371,3 +371,60 @@ describe('custom card font', () => {
     }
   })
 })
+
+describe('system font export', () => {
+  async function fontSubtypes(bytes: Uint8Array): Promise<string[]> {
+    const document = await PDFDocument.load(bytes)
+    const subtypes: string[] = []
+
+    for (const [, object] of document.context.enumerateIndirectObjects()) {
+      if (object instanceof PDFDict && object.get(PDFName.of('Type'))?.toString() === '/Font') {
+        subtypes.push(object.get(PDFName.of('Subtype'))?.toString() ?? '?')
+      }
+    }
+
+    return subtypes
+  }
+
+  it('embeds an installed system font when the browser exposes it', async () => {
+    const fontBytes = readFileSync(
+      resolve(process.cwd(), 'src/assets/fonts/GameScoreDemoRegular.ttf'),
+    )
+    vi.stubGlobal(
+      'queryLocalFonts',
+      vi.fn(async () => [
+        { family: 'Arial', blob: async () => new Blob([fontBytes]) },
+        { family: 'Roboto', blob: async () => new Blob([fontBytes]) },
+      ]),
+    )
+
+    try {
+      const bytes = await generateCardPdf(makeCard({ title: 'Guerreiro' }), {
+        fontId: 'system:Roboto',
+      })
+      const subtypes = await fontSubtypes(bytes)
+
+      expect(pdfHeader(bytes)).toBe('%PDF-')
+      expect(subtypes).toContain('/Type0')
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('falls back to standard fonts when local font access is unavailable', async () => {
+    vi.stubGlobal('queryLocalFonts', undefined)
+
+    try {
+      const bytes = await generateCardPdf(makeCard({ title: 'Guerreiro' }), {
+        fontId: 'system:Helvetica Neue',
+      })
+      const subtypes = await fontSubtypes(bytes)
+
+      expect(pdfHeader(bytes)).toBe('%PDF-')
+      expect(subtypes).toContain('/Type1')
+      expect(subtypes).not.toContain('/Type0')
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+})

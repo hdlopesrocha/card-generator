@@ -1,5 +1,7 @@
 # Card Generator
 
+**Live demo: https://hdlopesrocha.github.io/card-generator/**
+
 A standalone, client-side game card generator built with Vue 3, TypeScript and Vite. Create, edit, preview and print trading/strategy style cards with three zone themes. **No backend is required**: there is no server, no REST API and no database server. Everything runs in the browser, and all data is stored locally with IndexedDB.
 
 ## Prerequisites
@@ -19,7 +21,7 @@ npm install
 npm run dev
 ```
 
-Starts the Vite development server with hot module replacement. The application is served as a pure client-side SPA; routes use HTML5 history and navigation never reloads the page.
+Starts the Vite development server with hot module replacement. The application is served as a pure client-side SPA; routes use hash history (for example `/#/cards`) and navigation never reloads the page.
 
 ## Production build
 
@@ -239,13 +241,12 @@ Available operations: export the current card (editor, preview page or list entr
 
 ## Card fonts
 
-Every font file placed in `src/assets/fonts` (`.ttf`, `.otf`, `.woff` or `.woff2`) is discovered automatically by `src/config/fonts.ts` and can be chosen from the **Card font** dropdown in the Cards page header:
+Every font file placed in `src/assets/fonts` (`.ttf`, `.otf`, `.woff` or `.woff2`) is discovered automatically by `src/config/fonts.ts` and listed first in the **Card font** dropdown on the Cards page header. After them, the dropdown offers a curated group of **system fonts** commonly installed on Windows, macOS/iOS, Linux and Android (Segoe UI, Calibri, Arial, Helvetica Neue, SF Pro, DejaVu Sans, Liberation Sans, Ubuntu, Noto Sans, Roboto, and many more).
 
-- The web card registers each font at runtime as an `@font-face` rule (`src/services/fonts/webFonts.ts`) and applies the selection through the `--font-card` CSS variable, so the Cards page, editor preview and preview page all use it.
-- The PDF renderer embeds the same selected font with `pdf-lib` and fontkit, so screen and print always match. When the font cannot be loaded, the export silently falls back to the standard fonts.
+- The web card registers each bundled font at runtime as an `@font-face` rule (`src/services/fonts/webFonts.ts`) and applies the selection through the `--font-card` CSS variable, so the Cards page, editor preview and preview page all use it. System fonts need no rule: the browser renders them directly when they are installed.
+- The PDF renderer embeds bundled fonts with `pdf-lib` and fontkit, so screen and print match. For system fonts, the export tries the Local Font Access API (Chromium-based browsers, permission gated) to read and embed the installed font; in browsers without that API the standard fonts are used as a fallback and a console warning is logged.
 - Fonts whose file name contains "demo" (and any font missing a glyph) are treated as *letters-only*: A-Z/a-z use the selected font while digits, punctuation and accented letters use the readable fallback font. This keeps the stats (`120`, `90`) and localized text clean even with watermarked demo/trial fonts.
 - The default font is `GameOnlineDemoRegular`. Removing a font file from the folder removes it from the dropdown on the next build.
-- System fonts installed on the machine are intentionally not listed: browsers cannot enumerate them and `pdf-lib` needs the actual font program to embed, so only bundled fonts can appear on screen and in the PDF.
 
 ## Languages
 
@@ -313,7 +314,7 @@ The application language is not one of these settings: it is chosen from the pic
 
 ## Routes
 
-Defined in `src/router/index.ts` with HTML5 history mode and lazily loaded views:
+Defined in `src/router/index.ts` with hash history mode and lazily loaded views. Hash routing keeps every route working on static hosts without rewrite rules (GitHub Pages returns a 404 status for HTML5 history deep links even when the app loads). On the deployed site the routes look like `https://hdlopesrocha.github.io/card-generator/#/cards`.
 
 | Route | View | Purpose |
 | --- | --- | --- |

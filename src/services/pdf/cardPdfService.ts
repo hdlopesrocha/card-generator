@@ -354,10 +354,55 @@ async function embedStandardFonts(document: PDFDocument): Promise<EmbeddedFonts>
 
 let hasWarnedAboutCardFont = false
 
+interface LocalFontData {
+  family: string
+  blob?: () => Promise<Blob>
+}
+
+interface LocalFontAccessGlobal {
+  queryLocalFonts?: () => Promise<LocalFontData[]>
+}
+
+async function fetchFontBytes(url: string): Promise<ArrayBuffer | null> {
+  try {
+    const response = await fetch(url)
+    if (!response.ok) return null
+    return await response.arrayBuffer()
+  } catch {
+    return null
+  }
+}
+
 /**
- * Embeds the selected card font for all card text. Demo fonts are limited to
- * letters with every other character falling back to the standard fonts.
- * Falls back entirely to the standard fonts when the file cannot be loaded,
+ * Reads the bytes of an installed system font through the Local Font Access
+ * API (Chromium only, permission gated). Returns null on every other browser
+ * so the export can fall back to the standard fonts.
+ */
+async function loadSystemFontBytes(family: string): Promise<ArrayBuffer | null> {
+  const api = globalThis as unknown as LocalFontAccessGlobal
+  if (typeof api.queryLocalFonts !== 'function') return null
+
+  try {
+    const fonts = await api.queryLocalFonts()
+    const match = fonts.find(
+      (font) =>
+        font.family.toLowerCase() === family.toLowerCase() && typeof font.blob === 'function',
+    )
+    if (!match?.blob) return null
+
+    const blob = await match.blob()
+    return await blob.arrayBuffer()
+  } catch {
+    // Permission denied or unsupported: the caller uses the standard fonts.
+    return null
+  }
+}
+
+/**
+ * Embeds the selected card font for all card text. Bundled demo fonts are
+ * limited to letters with every other character falling back to the standard
+ * fonts; system fonts are embedded when the browser exposes their bytes.
+ * Falls back entirely to the standard fonts when the font cannot be loaded,
  * so PDF generation never fails because of typography.
  */
 async function embedCardFonts(document: PDFDocument, fontId?: string): Promise<EmbeddedFonts> {
@@ -366,27 +411,32 @@ async function embedCardFonts(document: PDFDocument, fontId?: string): Promise<E
 
   if (!option) return standard
 
-  try {
-    const response = await fetch(option.url)
-    if (!response.ok) throw new Error(`HTTP ${response.status}`)
+  const bytes =
+    option.kind === 'bundled' && option.url
+      ? await fetchFontBytes(option.url)
+      : await loadSystemFontBytes(option.family)
 
-    const bytes = await response.arrayBuffer()
-    document.registerFontkit(fontkit)
-    const custom = await document.embedFont(bytes, { subset: true })
+  if (bytes) {
+    try {
+      document.registerFontkit(fontkit)
+      const custom = await document.embedFont(bytes, { subset: true })
 
-    return {
-      regular: new CardTextFont(custom, standard.regular.fallbackFont, option.lettersOnly),
-      bold: new CardTextFont(custom, standard.bold.fallbackFont, option.lettersOnly),
-      oblique: new CardTextFont(custom, standard.oblique.fallbackFont, option.lettersOnly),
+      return {
+        regular: new CardTextFont(custom, standard.regular.fallbackFont, option.lettersOnly),
+        bold: new CardTextFont(custom, standard.bold.fallbackFont, option.lettersOnly),
+        oblique: new CardTextFont(custom, standard.oblique.fallbackFont, option.lettersOnly),
+      }
+    } catch {
+      // Handled below with the standard fonts.
     }
-  } catch {
-    if (!hasWarnedAboutCardFont) {
-      hasWarnedAboutCardFont = true
-      console.warn('The card font could not be embedded; using standard PDF fonts.')
-    }
-
-    return standard
   }
+
+  if (!hasWarnedAboutCardFont) {
+    hasWarnedAboutCardFont = true
+    console.warn('The card font could not be embedded; using standard PDF fonts.')
+  }
+
+  return standard
 }
 
 async function embedArtwork(document: PDFDocument, card: Card): Promise<PDFImage | null> {

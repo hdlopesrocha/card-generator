@@ -6,7 +6,14 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
-import { CARD_FONTS, DEFAULT_CARD_FONT_ID, getCardFont, isCardFontId } from '@/config/fonts'
+import {
+  CARD_FONTS,
+  BUNDLED_CARD_FONTS,
+  SYSTEM_CARD_FONTS,
+  DEFAULT_CARD_FONT_ID,
+  getCardFont,
+  isCardFontId,
+} from '@/config/fonts'
 import { cardFontFamily } from '@/services/fonts/webFonts'
 import { STORAGE_KEYS } from '@/config/constants'
 import { useSettingsStore } from '@/stores/settingsStore'
@@ -14,10 +21,35 @@ import CardListView from '@/views/CardListView.vue'
 
 describe('card font registry', () => {
   it('discovers every bundled font', () => {
-    expect(CARD_FONTS.length).toBeGreaterThanOrEqual(2)
-    expect(CARD_FONTS.every((font) => font.id.length > 0)).toBe(true)
-    expect(CARD_FONTS.every((font) => font.url.length > 0)).toBe(true)
+    expect(BUNDLED_CARD_FONTS.length).toBeGreaterThanOrEqual(2)
+    expect(BUNDLED_CARD_FONTS.every((font) => font.id.length > 0)).toBe(true)
+    expect(BUNDLED_CARD_FONTS.every((font) => (font.url ?? '').length > 0)).toBe(true)
+    expect(new Set(BUNDLED_CARD_FONTS.map((font) => font.id)).size).toBe(
+      BUNDLED_CARD_FONTS.length,
+    )
+  })
+
+  it('lists the common system fonts after the bundled ones', () => {
+    expect(SYSTEM_CARD_FONTS.length).toBeGreaterThanOrEqual(40)
+    expect(SYSTEM_CARD_FONTS.every((font) => font.kind === 'system')).toBe(true)
+    expect(CARD_FONTS.slice(0, BUNDLED_CARD_FONTS.length)).toEqual(BUNDLED_CARD_FONTS)
+    expect(CARD_FONTS.slice(BUNDLED_CARD_FONTS.length)).toEqual(SYSTEM_CARD_FONTS)
     expect(new Set(CARD_FONTS.map((font) => font.id)).size).toBe(CARD_FONTS.length)
+  })
+
+  it('covers the major desktop and mobile platforms', () => {
+    const families = SYSTEM_CARD_FONTS.map((font) => font.family)
+
+    // Windows, macOS/iOS, Linux and Android representatives.
+    for (const family of ['Segoe UI', 'Helvetica Neue', 'DejaVu Sans', 'Roboto']) {
+      expect(families).toContain(family)
+    }
+  })
+
+  it('accepts system font ids', () => {
+    expect(isCardFontId('system:Arial')).toBe(true)
+    expect(getCardFont('system:Arial')?.family).toBe('Arial')
+    expect(isCardFontId('system:Definitely Not Installed')).toBe(false)
   })
 
   it('includes the demo game fonts and marks them as letters-only', () => {
@@ -41,6 +73,10 @@ describe('card font registry', () => {
     expect(family).toContain('sans-serif')
   })
 
+  it('builds a CSS font stack for a system font', () => {
+    expect(cardFontFamily('system:Helvetica Neue')).toContain("'Helvetica Neue', ")
+  })
+
   it('falls back to the default stack for unknown font ids', () => {
     expect(cardFontFamily('missing-font')).not.toContain('missing-font')
   })
@@ -52,7 +88,7 @@ describe('settings store card font', () => {
     localStorage.clear()
   })
 
-  it('defaults to the first bundled font', () => {
+  it('defaults to the default bundled font', () => {
     const settings = useSettingsStore()
 
     expect(settings.cardFontId).toBe(DEFAULT_CARD_FONT_ID)
@@ -64,8 +100,11 @@ describe('settings store card font', () => {
     settings.setCardFont('GameScoreDemoRegular')
     expect(settings.cardFontId).toBe('GameScoreDemoRegular')
 
+    settings.setCardFont('system:Roboto')
+    expect(settings.cardFontId).toBe('system:Roboto')
+
     settings.setCardFont('not-a-font')
-    expect(settings.cardFontId).toBe('GameScoreDemoRegular')
+    expect(settings.cardFontId).toBe('system:Roboto')
   })
 
   it('persists the selected font and restores it', async () => {
@@ -91,7 +130,7 @@ describe('settings store card font', () => {
 })
 
 describe('cards page font dropdown', () => {
-  it('lists every bundled font and updates the store on selection', async () => {
+  it('lists bundled fonts first, then system fonts, and updates the store', async () => {
     const pinia = createPinia()
     setActivePinia(pinia)
 
@@ -112,19 +151,19 @@ describe('cards page font dropdown', () => {
 
     const select = wrapper.find('#cards-card-font')
     expect(select.exists()).toBe(true)
+    expect(select.findAll('optgroup')).toHaveLength(2)
+    expect(select.findAll('optgroup')[0]!.attributes('label')).toBe('Bundled fonts')
+    expect(select.findAll('optgroup')[1]!.attributes('label')).toBe('System fonts')
 
     const values = select
       .findAll('option')
       .map((option) => option.attributes('value'))
     expect(values).toEqual(CARD_FONTS.map((font) => font.id))
 
-    const target = CARD_FONTS.find((font) => font.id !== DEFAULT_CARD_FONT_ID)
-    expect(target).toBeDefined()
-
-    await select.setValue(target!.id)
+    await select.setValue('system:Roboto')
     await nextTick()
 
     const settings = useSettingsStore()
-    expect(settings.cardFontId).toBe(target!.id)
+    expect(settings.cardFontId).toBe('system:Roboto')
   })
 })

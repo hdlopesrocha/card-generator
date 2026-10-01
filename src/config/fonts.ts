@@ -1,10 +1,11 @@
 /**
  * Card font registry.
  *
- * Every font placed in `src/assets/fonts` is discovered automatically and can
- * be selected for card text from the Settings page. The registry is also used
- * by the PDF renderer, so the on-screen card and the PDF always embed the
- * same font.
+ * Bundled fonts (in `src/assets/fonts`) are discovered automatically and can
+ * always be embedded in the PDF. After them, a curated list of fonts commonly
+ * installed on Windows, macOS/iOS, Linux and Android is offered; those render
+ * on screen when the user actually has them, and are embedded in the PDF when
+ * the browser exposes the local font data (Chromium's Local Font Access API).
  */
 
 const fontModules = import.meta.glob('/src/assets/fonts/*.{ttf,otf,woff,woff2}', {
@@ -13,15 +14,20 @@ const fontModules = import.meta.glob('/src/assets/fonts/*.{ttf,otf,woff,woff2}',
   eager: true,
 }) as Record<string, string>
 
+export type CardFontKind = 'bundled' | 'system'
+
 export interface CardFontOption {
-  /** Stable id (file name without extension) used as the CSS family name. */
+  /** Stable id used by settings; `system:<Family>` for system fonts. */
   id: string
   /** Human readable label for the dropdown. */
   label: string
-  /** Bundled asset URL. */
-  url: string
-  /** CSS `format()` value for the @font-face rule. */
-  format: string
+  kind: CardFontKind
+  /** CSS font-family name (same as the id for bundled fonts). */
+  family: string
+  /** Bundled asset URL (bundled fonts only). */
+  url?: string
+  /** CSS `format()` value for the @font-face rule (bundled fonts only). */
+  format?: string
   /**
    * Demo fonts only provide real glyphs for A-Z/a-z and replace digits,
    * punctuation and accented letters with a watermark. When true, everything
@@ -58,13 +64,15 @@ function humanizeFontName(id: string): string {
   return spaced.replace(/[-_ ]?(Regular|Bold|Italic)$/i, '').trim() || id
 }
 
-export const CARD_FONTS: CardFontOption[] = Object.entries(fontModules)
+export const BUNDLED_CARD_FONTS: CardFontOption[] = Object.entries(fontModules)
   .map(([path, url]) => {
     const fileName = path.split('/').pop() ?? path
     const id = fileName.replace(/\.[^.]+$/, '')
     return {
       id,
       label: humanizeFontName(id),
+      kind: 'bundled' as const,
+      family: id,
       url,
       format: formatFor(extensionOf(fileName)),
       lettersOnly: /demo/i.test(id),
@@ -72,8 +80,125 @@ export const CARD_FONTS: CardFontOption[] = Object.entries(fontModules)
   })
   .sort((a, b) => a.label.localeCompare(b.label))
 
+/**
+ * Common fonts shipped with (or available on) the major desktop and mobile
+ * systems. Firefox, Safari and mobile browsers cannot enumerate local fonts,
+ * so this static list is offered for everyone; selecting one shows it on
+ * screen when installed.
+ */
+const SYSTEM_FONT_FAMILIES = [
+  // Windows
+  'Arial',
+  'Arial Black',
+  'Bahnschrift',
+  'Calibri',
+  'Cambria',
+  'Candara',
+  'Comic Sans MS',
+  'Consolas',
+  'Constantia',
+  'Corbel',
+  'Courier New',
+  'Franklin Gothic Medium',
+  'Gabriola',
+  'Georgia',
+  'Impact',
+  'Lucida Console',
+  'Lucida Sans Unicode',
+  'Microsoft Sans Serif',
+  'Palatino Linotype',
+  'Segoe Print',
+  'Segoe Script',
+  'Segoe UI',
+  'Tahoma',
+  'Times New Roman',
+  'Trebuchet MS',
+  'Verdana',
+  // macOS / iOS
+  'American Typewriter',
+  'Apple Chancery',
+  'Avenir',
+  'Avenir Next',
+  'Baskerville',
+  'Bradley Hand',
+  'Chalkboard',
+  'Chalkboard SE',
+  'Cochin',
+  'Copperplate',
+  'Didot',
+  'Futura',
+  'Gill Sans',
+  'Helvetica',
+  'Helvetica Neue',
+  'Herculanum',
+  'Hoefler Text',
+  'Lucida Grande',
+  'Marker Felt',
+  'Menlo',
+  'Monaco',
+  'Optima',
+  'Palatino',
+  'Papyrus',
+  'Savoye LET',
+  'SF Pro Display',
+  'SF Pro Text',
+  'Skia',
+  'Snell Roundhand',
+  'Times',
+  'Zapfino',
+  // Linux
+  'Cantarell',
+  'DejaVu Sans',
+  'DejaVu Sans Mono',
+  'DejaVu Serif',
+  'FreeMono',
+  'FreeSans',
+  'FreeSerif',
+  'Liberation Mono',
+  'Liberation Sans',
+  'Liberation Serif',
+  'Nimbus Roman',
+  'Nimbus Sans',
+  'Noto Sans',
+  'Noto Serif',
+  'Oxygen',
+  'Ubuntu',
+  'Ubuntu Condensed',
+  // Android
+  'Carrois Gothic',
+  'Coming Soon',
+  'Cutive Mono',
+  'Dancing Script',
+  'Droid Sans',
+  'Droid Serif',
+  'Roboto',
+  'Roboto Condensed',
+  'Roboto Mono',
+] as const
+
+const seenFamilies = new Set<string>()
+
+export const SYSTEM_CARD_FONTS: CardFontOption[] = SYSTEM_FONT_FAMILIES.filter((family) => {
+  const key = family.toLowerCase()
+  if (seenFamilies.has(key)) return false
+  seenFamilies.add(key)
+  return true
+})
+  .map((family) => ({
+    id: `system:${family}`,
+    label: family,
+    kind: 'system' as const,
+    family,
+    lettersOnly: false,
+  }))
+  .sort((a, b) => a.label.localeCompare(b.label))
+
+/** Bundled fonts first, then the common system fonts. */
+export const CARD_FONTS: CardFontOption[] = [...BUNDLED_CARD_FONTS, ...SYSTEM_CARD_FONTS]
+
 export const DEFAULT_CARD_FONT_ID = (
-  CARD_FONTS.find((font) => font.id === 'GameOnlineDemoRegular') ?? CARD_FONTS[0]
+  BUNDLED_CARD_FONTS.find((font) => font.id === 'GameOnlineDemoRegular') ??
+  BUNDLED_CARD_FONTS[0]
 )?.id ?? ''
 
 export function isCardFontId(value: unknown): value is string {

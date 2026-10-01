@@ -5,7 +5,7 @@ import CardListItem from '@/components/CardListItem.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import ExportDialog from '@/components/ExportDialog.vue'
-import { CARD_FONTS } from '@/config/fonts'
+import { BUNDLED_CARD_FONTS, SYSTEM_CARD_FONTS } from '@/config/fonts'
 import type { Card } from '@/models/Card'
 import { parseCardsCsvFile, downloadCardsCsv } from '@/services/csv/csvService'
 import { resolveAllBundledImages } from '@/services/image/bundledImages'
@@ -257,11 +257,19 @@ async function handleCsvImport(event: Event): Promise<void> {
             class="form-control card-font-picker__select"
             :value="settings.cardFontId"
             :aria-label="t('settings.cardFont')"
+            :title="t('settings.cardFontSystemHint')"
             @change="handleFontChange"
           >
-            <option v-for="font in CARD_FONTS" :key="font.id" :value="font.id">
-              {{ font.label }}
-            </option>
+            <optgroup :label="t('settings.cardFontBundled')">
+              <option v-for="font in BUNDLED_CARD_FONTS" :key="font.id" :value="font.id">
+                {{ font.label }}
+              </option>
+            </optgroup>
+            <optgroup :label="t('settings.cardFontSystem')">
+              <option v-for="font in SYSTEM_CARD_FONTS" :key="font.id" :value="font.id">
+                {{ font.label }}
+              </option>
+            </optgroup>
           </select>
         </label>
 
