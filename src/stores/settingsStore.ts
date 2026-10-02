@@ -1,7 +1,7 @@
 import { computed, ref, watch } from 'vue'
 import { defineStore } from 'pinia'
 
-import { IMAGE_QUALITY, PDF_CONSTANTS, STORAGE_KEYS } from '@/config/constants'
+import { CARD_FONT_SCALE, IMAGE_QUALITY, PDF_CONSTANTS, STORAGE_KEYS } from '@/config/constants'
 import { DEFAULT_CARD_FONT_ID, isCardFontId } from '@/config/fonts'
 
 export interface AppSettings {
@@ -9,6 +9,7 @@ export interface AppSettings {
   cardHeightMm: number
   imageQuality: number
   cardFontId: string
+  cardFontScale: number
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -16,6 +17,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   cardHeightMm: PDF_CONSTANTS.cardHeightMm,
   imageQuality: IMAGE_QUALITY.default,
   cardFontId: DEFAULT_CARD_FONT_ID,
+  cardFontScale: CARD_FONT_SCALE.default,
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -71,6 +73,14 @@ function readStoredSettings(): Partial<AppSettings> {
       settings.cardFontId = parsed.cardFontId
     }
 
+    if (typeof parsed.cardFontScale === 'number' && Number.isFinite(parsed.cardFontScale)) {
+      settings.cardFontScale = clamp(
+        parsed.cardFontScale,
+        CARD_FONT_SCALE.min,
+        CARD_FONT_SCALE.max,
+      )
+    }
+
     return settings
   } catch {
     return {}
@@ -84,6 +94,7 @@ export const useSettingsStore = defineStore('settings', () => {
   const cardHeightMm = ref<number>(stored.cardHeightMm ?? DEFAULT_SETTINGS.cardHeightMm)
   const imageQuality = ref<number>(stored.imageQuality ?? DEFAULT_SETTINGS.imageQuality)
   const cardFontId = ref<string>(stored.cardFontId ?? DEFAULT_SETTINGS.cardFontId)
+  const cardFontScale = ref<number>(stored.cardFontScale ?? DEFAULT_SETTINGS.cardFontScale)
 
   const cardAspectRatio = computed(() => `${cardWidthMm.value} / ${cardHeightMm.value}`)
 
@@ -96,6 +107,7 @@ export const useSettingsStore = defineStore('settings', () => {
       cardHeightMm: cardHeightMm.value,
       imageQuality: imageQuality.value,
       cardFontId: cardFontId.value,
+      cardFontScale: cardFontScale.value,
     }
 
     try {
@@ -135,24 +147,33 @@ export const useSettingsStore = defineStore('settings', () => {
     }
   }
 
+  function setCardFontScale(value: number): void {
+    if (Number.isFinite(value)) {
+      cardFontScale.value = clamp(value, CARD_FONT_SCALE.min, CARD_FONT_SCALE.max)
+    }
+  }
+
   function resetToDefaults(): void {
     cardWidthMm.value = DEFAULT_SETTINGS.cardWidthMm
     cardHeightMm.value = DEFAULT_SETTINGS.cardHeightMm
     imageQuality.value = DEFAULT_SETTINGS.imageQuality
     cardFontId.value = DEFAULT_SETTINGS.cardFontId
+    cardFontScale.value = DEFAULT_SETTINGS.cardFontScale
   }
 
-  watch([cardWidthMm, cardHeightMm, imageQuality, cardFontId], persist)
+  watch([cardWidthMm, cardHeightMm, imageQuality, cardFontId, cardFontScale], persist)
 
   return {
     cardWidthMm,
     cardHeightMm,
     imageQuality,
     cardFontId,
+    cardFontScale,
     cardAspectRatio,
     setCardDimensions,
     setImageQuality,
     setCardFont,
+    setCardFontScale,
     resetToDefaults,
   }
 })

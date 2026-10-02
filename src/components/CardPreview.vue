@@ -46,6 +46,7 @@ const rootStyle = computed(
       width: `min(${props.widthPx}px, 100%)`,
       // Always match the physical dimensions configured for the PDF.
       '--card-aspect': settings.cardAspectRatio,
+      '--card-font-scale': settings.cardFontScale,
     }) as CSSProperties,
 )
 </script>

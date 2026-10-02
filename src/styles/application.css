@@ -306,6 +306,26 @@ a:hover {
   font-weight: 650;
 }
 
+.card-font-size {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.card-font-size__input {
+  width: 4.75rem;
+  padding: 0.55rem 0.5rem;
+  font-size: 0.86rem;
+  font-weight: 650;
+  text-align: right;
+}
+
+.card-font-size__suffix {
+  color: var(--color-text-muted);
+  font-size: 0.86rem;
+  font-weight: 650;
+}
+
 /* ------------------------------------------------------------------ */
 /* Panels                                                              */
 /* ------------------------------------------------------------------ */

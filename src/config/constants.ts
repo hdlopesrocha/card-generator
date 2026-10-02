@@ -32,6 +32,13 @@ export const IMAGE_QUALITY = {
   default: 0.85,
 } as const
 
+export const CARD_FONT_SCALE = {
+  min: 0.75,
+  max: 1.5,
+  step: 0.05,
+  default: 1,
+} as const
+
 export const PDF_CONSTANTS = {
   /** Default physical card size in millimetres (63 x 88 mm). */
   cardWidthMm: 63,

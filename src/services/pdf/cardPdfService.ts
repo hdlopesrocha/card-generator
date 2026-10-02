@@ -32,7 +32,7 @@ import {
 } from 'pdf-lib'
 import fontkit from '@pdf-lib/fontkit'
 
-import { PDF_CONSTANTS } from '@/config/constants'
+import { CARD_FONT_SCALE, PDF_CONSTANTS } from '@/config/constants'
 import { getCardFont } from '@/config/fonts'
 import { getCardTextLabels, getZoneLabel, translate, type CardTextLabels } from '@/config/languages'
 import { getZoneTheme, type ZoneTheme } from '@/config/zones'
@@ -51,6 +51,8 @@ export interface PdfGenerationOptions {
   cardHeightMm?: number
   language?: Language
   fontId?: string
+  /** Multiplier applied to every card text size (1 = 100%). */
+  fontScale?: number
 }
 
 /* ------------------------------------------------------------------ */
@@ -76,6 +78,7 @@ export async function generateCardsPdf(
 
   const cardWidth = resolveMm(options.cardWidthMm, PDF_CONSTANTS.cardWidthMm) * MM_TO_PT
   const cardHeight = resolveMm(options.cardHeightMm, PDF_CONSTANTS.cardHeightMm) * MM_TO_PT
+  const fontScale = resolveFontScale(options.fontScale)
 
   const document = await PDFDocument.create()
   const fonts = await embedCardFonts(document, options.fontId)
@@ -96,6 +99,7 @@ export async function generateCardsPdf(
       image,
       language,
       artworkShade,
+      fontScale,
     )
   }
 
@@ -152,6 +156,12 @@ const MM_TO_PT = PDF_CONSTANTS.mmToPt
 
 function resolveMm(value: number | undefined, fallback: number): number {
   return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : fallback
+}
+
+function resolveFontScale(value: number | undefined): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return CARD_FONT_SCALE.default
+
+  return Math.min(CARD_FONT_SCALE.max, Math.max(CARD_FONT_SCALE.min, value))
 }
 
 /* ------------------------------------------------------------------ */
@@ -332,6 +342,8 @@ interface CardRenderContext {
   top: number
   width: number
   height: number
+  /** Multiplier applied to every card text size (1 = 100%). */
+  fontScale: number
 }
 
 /** Axis-aligned box in card-local coordinates (origin at the top-left). */
@@ -798,10 +810,11 @@ function drawCard(
   image: PDFImage | null,
   language: Language,
   shade: PDFImage,
+  fontScale: number,
 ): void {
   const theme = getZoneTheme(card.zone)
   const labels = getCardTextLabels(language)
-  const ctx: CardRenderContext = { page, left, top, width, height }
+  const ctx: CardRenderContext = { page, left, top, width, height, fontScale }
   const contentRatio = height / width - CONTENT_INSET * 2
   const vScale = clamp(contentRatio / WORST_CONTENT_RATIO, 0.3, 1)
 
@@ -815,7 +828,7 @@ function drawCard(
   const gap = LAYOUT.sectionGap * width * vScale
 
   /* ---- zone badge metrics ---- */
-  const badgeFontSize = LAYOUT.badgeTextSize * width * vScale
+  const badgeFontSize = LAYOUT.badgeTextSize * width * vScale * fontScale
   const badgeLabel = normalizeForFont(fonts.bold, getZoneLabel(card.zone, language).toUpperCase())
   const badgeTracking = LAYOUT.badgeTracking * badgeFontSize
   const badgeTextWidth = trackedTextWidth(fonts.bold, badgeLabel, badgeFontSize, badgeTracking)
@@ -828,12 +841,12 @@ function drawCard(
 
   /* ---- header ---- */
   const columnWidth = Math.max(1, contentWidth - gap - badgeWidth)
-  const titleBaseSize = LAYOUT.titleSize * width * vScale
+  const titleBaseSize = LAYOUT.titleSize * width * vScale * fontScale
   const titleText = card.title.trim() ? card.title : labels.untitled
   const title = fitTitle(titleText, fonts.bold, titleBaseSize, columnWidth, LAYOUT.titleMaxLines)
   const titleLineHeight = title.size * LAYOUT.titleLineHeight
   const titleBlockHeight = title.lines.length * titleLineHeight
-  const subtitleSize = LAYOUT.subtitleSize * width * vScale
+  const subtitleSize = LAYOUT.subtitleSize * width * vScale * fontScale
   const subtitle = card.subtitle
     ? ellipsize(
         normalizeForFont(fonts.oblique, card.subtitle.toUpperCase()),
@@ -848,8 +861,8 @@ function drawCard(
   const headerHeight = Math.max(titleBlockHeight + subtitleBlockHeight, badgeHeight)
 
   /* ---- statistics ---- */
-  const statLabelSize = LAYOUT.statLabelSize * width * vScale
-  const statValueSize = LAYOUT.statValueSize * width * vScale
+  const statLabelSize = LAYOUT.statLabelSize * width * vScale * fontScale
+  const statValueSize = LAYOUT.statValueSize * width * vScale * fontScale
   const statIconSize = LAYOUT.statIcon * width * vScale
   const statsPanelWidth = (contentWidth - LAYOUT.statsGap * width) / 2
   const statBodyHeight = statLabelSize * 1.2 + statValueSize * 1.05
@@ -857,14 +870,14 @@ function drawCard(
     LAYOUT.statPadY * 2 * width * vScale + Math.max(statIconSize, statBodyHeight)
 
   /* ---- stars ---- */
-  const starRadius = LAYOUT.starRadius * width * vScale
+  const starRadius = LAYOUT.starRadius * width * vScale * fontScale
   const starGap = LAYOUT.starGap * width * vScale
   const starsHeight = starRadius * 2
 
   /* ---- action ---- */
   const actionPadX = LAYOUT.actionPadX * width
   const actionPadY = LAYOUT.actionPadY * width * vScale
-  const actionLabelSize = LAYOUT.actionLabelSize * width * vScale
+  const actionLabelSize = LAYOUT.actionLabelSize * width * vScale * fontScale
   const actionLabelGap = LAYOUT.actionLabelGap * width * vScale
   const actionInnerWidth = Math.max(1, contentWidth - actionPadX * 2)
   const artworkMinHeight = LAYOUT.artworkMinHeight * width * vScale
@@ -881,7 +894,7 @@ function drawCard(
     fonts.regular,
     actionInnerWidth,
     actionInnerHeight,
-    LAYOUT.actionTextSize * width * vScale,
+    LAYOUT.actionTextSize * width * vScale * fontScale,
   )
   const actionHeight = Math.min(
     maxActionHeight,
@@ -1323,8 +1336,8 @@ function drawArtworkPlaceholder(
     (card.title.trim().charAt(0) || '?').toUpperCase(),
   )
   const labelText = normalizeForFont(fonts.bold, labels.noArtwork.toUpperCase())
-  const initialSize = box.width * 0.24
-  const labelSize = box.width * 0.032
+  const initialSize = box.width * 0.24 * ctx.fontScale
+  const labelSize = box.width * 0.032 * ctx.fontScale
   const labelTracking = labelSize * 0.24
   const initialWidth = measure(fonts.bold, initialText, initialSize)
   const labelWidth = trackedTextWidth(fonts.bold, labelText, labelSize, labelTracking)

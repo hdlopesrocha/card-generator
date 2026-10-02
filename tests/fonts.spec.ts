@@ -18,7 +18,7 @@ import {
   systemFontFamiliesFor,
 } from '@/config/fonts'
 import { cardFontFamily } from '@/services/fonts/webFonts'
-import { STORAGE_KEYS } from '@/config/constants'
+import { CARD_FONT_SCALE, STORAGE_KEYS } from '@/config/constants'
 import { useSettingsStore } from '@/stores/settingsStore'
 import CardListView from '@/views/CardListView.vue'
 
@@ -150,6 +150,56 @@ describe('settings store card font', () => {
     settings.resetToDefaults()
     expect(settings.cardFontId).toBe(DEFAULT_CARD_FONT_ID)
   })
+
+  it('defaults the card font scale to 100%', () => {
+    const settings = useSettingsStore()
+
+    expect(settings.cardFontScale).toBe(CARD_FONT_SCALE.default)
+  })
+
+  it('clamps the font scale and ignores invalid values', () => {
+    const settings = useSettingsStore()
+
+    settings.setCardFontScale(1.25)
+    expect(settings.cardFontScale).toBe(1.25)
+
+    settings.setCardFontScale(10)
+    expect(settings.cardFontScale).toBe(CARD_FONT_SCALE.max)
+
+    settings.setCardFontScale(0.1)
+    expect(settings.cardFontScale).toBe(CARD_FONT_SCALE.min)
+
+    settings.setCardFontScale(0.1)
+    settings.setCardFontScale(Number.NaN)
+    expect(settings.cardFontScale).toBe(CARD_FONT_SCALE.min)
+  })
+
+  it('persists and restores the font scale', async () => {
+    const settings = useSettingsStore()
+    settings.setCardFontScale(1.2)
+    await nextTick()
+
+    const stored = JSON.parse(localStorage.getItem(STORAGE_KEYS.settings) ?? '{}')
+    expect(stored.cardFontScale).toBe(1.2)
+
+    setActivePinia(createPinia())
+    expect(useSettingsStore().cardFontScale).toBe(1.2)
+  })
+
+  it('clamps a stored font scale when restoring settings', () => {
+    localStorage.setItem(STORAGE_KEYS.settings, JSON.stringify({ cardFontScale: 4 }))
+    setActivePinia(createPinia())
+
+    expect(useSettingsStore().cardFontScale).toBe(CARD_FONT_SCALE.max)
+  })
+
+  it('resets the font scale to the default', () => {
+    const settings = useSettingsStore()
+    settings.setCardFontScale(1.3)
+
+    settings.resetToDefaults()
+    expect(settings.cardFontScale).toBe(CARD_FONT_SCALE.default)
+  })
 })
 
 describe('cards page font dropdown', () => {
@@ -189,5 +239,43 @@ describe('cards page font dropdown', () => {
 
     const settings = useSettingsStore()
     expect(settings.cardFontId).toBe(systemId)
+  })
+
+  it('updates the font scale from the cards page control', async () => {
+    const pinia = createPinia()
+    setActivePinia(pinia)
+
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: '/', component: { template: '<div />' } },
+        { path: '/cards', component: CardListView },
+        { path: '/cards/new', component: { template: '<div />' } },
+        { path: '/settings', component: { template: '<div />' } },
+      ],
+    })
+    await router.push('/cards')
+    await router.isReady()
+
+    const wrapper = mount(CardListView, { global: { plugins: [pinia, router] } })
+    await flushPromises()
+
+    const input = wrapper.find('#cards-font-size')
+    expect(input.exists()).toBe(true)
+    expect((input.element as HTMLInputElement).value).toBe('100')
+
+    await input.setValue('120')
+    await input.trigger('change')
+    await nextTick()
+
+    const settings = useSettingsStore()
+    expect(settings.cardFontScale).toBeCloseTo(1.2)
+
+    await input.setValue('999')
+    await input.trigger('change')
+    await nextTick()
+
+    expect(settings.cardFontScale).toBe(CARD_FONT_SCALE.max)
+    expect((input.element as HTMLInputElement).value).toBe(String(CARD_FONT_SCALE.max * 100))
   })
 })

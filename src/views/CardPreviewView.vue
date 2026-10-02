@@ -34,6 +34,7 @@ const pdfOptions = computed(() => ({
   cardWidthMm: settings.cardWidthMm,
   cardHeightMm: settings.cardHeightMm,
   fontId: settings.cardFontId,
+  fontScale: settings.cardFontScale,
 }))
 
 function setStatus(kind: 'success' | 'error', message: string): void {

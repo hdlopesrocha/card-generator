@@ -5,6 +5,7 @@ import CardListItem from '@/components/CardListItem.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import ExportDialog from '@/components/ExportDialog.vue'
+import { CARD_FONT_SCALE } from '@/config/constants'
 import { BUNDLED_CARD_FONTS, SYSTEM_CARD_FONTS } from '@/config/fonts'
 import type { Card } from '@/models/Card'
 import { parseCardsCsvFile, downloadCardsCsv } from '@/services/csv/csvService'
@@ -37,6 +38,7 @@ const pdfOptions = computed(() => ({
   cardWidthMm: settings.cardWidthMm,
   cardHeightMm: settings.cardHeightMm,
   fontId: settings.cardFontId,
+  fontScale: settings.cardFontScale,
 }))
 
 const cardCountText = computed(() =>
@@ -204,6 +206,19 @@ function handleFontChange(event: Event): void {
   settings.setCardFont(target.value)
 }
 
+const cardFontSizePercent = computed(() => Math.round(settings.cardFontScale * 100))
+
+function handleFontSizeChange(event: Event): void {
+  const input = event.target as HTMLInputElement
+  const percent = Number(input.value)
+
+  if (Number.isFinite(percent)) {
+    settings.setCardFontScale(percent / 100)
+  }
+
+  input.value = String(Math.round(settings.cardFontScale * 100))
+}
+
 async function handleCsvImport(event: Event): Promise<void> {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
@@ -271,6 +286,24 @@ async function handleCsvImport(event: Event): Promise<void> {
               </option>
             </optgroup>
           </select>
+        </label>
+
+        <label class="card-font-size">
+          <span class="visually-hidden">{{ t('cards.fontSize') }}</span>
+          <input
+            id="cards-font-size"
+            class="form-control card-font-size__input"
+            type="number"
+            inputmode="numeric"
+            :min="CARD_FONT_SCALE.min * 100"
+            :max="CARD_FONT_SCALE.max * 100"
+            :step="CARD_FONT_SCALE.step * 100"
+            :value="cardFontSizePercent"
+            :aria-label="t('cards.fontSize')"
+            :title="t('cards.fontSize')"
+            @change="handleFontSizeChange"
+          />
+          <span class="card-font-size__suffix" aria-hidden="true">%</span>
         </label>
 
         <RouterLink class="btn btn--primary" to="/cards/new">

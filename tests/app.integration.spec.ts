@@ -12,6 +12,7 @@ import CardPreview from '@/components/CardPreview.vue'
 import ExportDialog from '@/components/ExportDialog.vue'
 import { Zone, type Card } from '@/models/Card'
 import { useCardStore } from '@/stores/cardStore'
+import { useSettingsStore } from '@/stores/settingsStore'
 
 function makeRouter(): Router {
   return createRouter({
@@ -193,6 +194,26 @@ describe('application integration', () => {
 
     await wrapper.setProps({ card: { ...baseCard, zone: Zone.DEFENSE } })
     expect(wrapper.classes()).toContain('zone-defense')
+  })
+
+  it('applies the configured card font scale as a CSS variable', () => {
+    useSettingsStore().setCardFontScale(1.25)
+
+    const card: Card = {
+      id: 'scale-fixture',
+      title: 'Scale Fixture',
+      subtitle: 'Theme',
+      attack: 10,
+      defense: 20,
+      action: 'Test the scale.',
+      image: null,
+      zone: Zone.ATTACK,
+      stars: 2,
+      translations: {},
+    }
+
+    const wrapper = mount(CardPreview, { props: { card }, global: { plugins: [pinia] } })
+    expect(wrapper.attributes('style')).toContain('--card-font-scale: 1.25')
   })
 
   it('exports the selected cards from the export dialog', async () => {

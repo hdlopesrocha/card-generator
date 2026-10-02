@@ -418,6 +418,15 @@ export const MESSAGES = {
     NL: 'CSV downloaden',
     IT: 'Scarica CSV',
   },
+  'cards.fontSize': {
+    EN: 'Font size',
+    PT: 'Tamanho da letra',
+    FR: 'Taille du texte',
+    ES: 'Tamaño del texto',
+    DE: 'Schriftgröße',
+    NL: 'Tekstgrootte',
+    IT: 'Dimensione testo',
+  },
   'cards.backupImport': {
     EN: 'Backup & Import',
     PT: 'Backup e importação',

@@ -13,6 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { Card } from '@/models/Card'
 import { Zone } from '@/models/Card'
+import { CARD_FONT_SCALE } from '@/config/constants'
 import {
   buildCardsPdfFilename,
   downloadPdf,
@@ -117,6 +118,11 @@ function embeddedImageSizes(document: PDFDocument, pageIndex = 0): Array<[number
   return sizes
 }
 
+/** Every font size used by the page text (`/F1 12 Tf` operands). */
+function textFontSizes(content: string): number[] {
+  return [...content.matchAll(/\/[^\s/]+ ([\d.]+) Tf/g)].map((match) => Number(match[1]))
+}
+
 describe('generateCardsPdf', () => {
   it('produces a valid PDF with one page per card', async () => {
     const bytes = await generateCardsPdf(makeCards(3))
@@ -183,6 +189,31 @@ describe('generateCardPdf', () => {
     const document = await loadPdf(await generateCardPdf(makeCard({ image: TINY_PNG_DATA_URL })))
 
     expect(embeddedImageSizes(document)).toContainEqual([1, 256])
+  })
+
+  it('scales the card text with the font scale option', async () => {
+    const normal = textFontSizes(
+      readPageContent(await loadPdf(await generateCardPdf(makeCard()))),
+    )
+    const large = textFontSizes(
+      readPageContent(await loadPdf(await generateCardPdf(makeCard(), { fontScale: 1.5 }))),
+    )
+
+    expect(normal.length).toBeGreaterThan(0)
+    expect(Math.max(...large)).toBeGreaterThan(Math.max(...normal))
+  })
+
+  it('clamps out-of-range font scales', async () => {
+    const huge = textFontSizes(
+      readPageContent(await loadPdf(await generateCardPdf(makeCard(), { fontScale: 10 }))),
+    )
+    const atMax = textFontSizes(
+      readPageContent(
+        await loadPdf(await generateCardPdf(makeCard(), { fontScale: CARD_FONT_SCALE.max })),
+      ),
+    )
+
+    expect(huge).toEqual(atMax)
   })
 
   it('does not throw for a 60 character title and a 240 character action', async () => {
