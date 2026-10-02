@@ -6,6 +6,7 @@ import {
   PDFDocument,
   PDFDict,
   PDFName,
+  PDFNumber,
   PDFRawStream,
 } from 'pdf-lib'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -91,6 +92,31 @@ function readPageContent(document: PDFDocument, pageIndex = 0): string {
   return chunks.join('\n')
 }
 
+/** [width, height] of every image XObject referenced by a page. */
+function embeddedImageSizes(document: PDFDocument, pageIndex = 0): Array<[number, number]> {
+  const xObjects = document
+    .getPage(pageIndex)
+    .node.Resources()
+    ?.lookup(PDFName.of('XObject'), PDFDict)
+  if (!xObjects) return []
+
+  const sizes: Array<[number, number]> = []
+  for (const value of xObjects.values()) {
+    const stream = document.context.lookup(value)
+    if (!(stream instanceof PDFRawStream)) continue
+
+    const subtype = stream.dict.get(PDFName.of('Subtype'))
+    if (!(subtype instanceof PDFName) || subtype.asString() !== '/Image') continue
+
+    const width = stream.dict.get(PDFName.of('Width'))
+    const height = stream.dict.get(PDFName.of('Height'))
+    if (!(width instanceof PDFNumber) || !(height instanceof PDFNumber)) continue
+
+    sizes.push([width.asNumber(), height.asNumber()])
+  }
+  return sizes
+}
+
 describe('generateCardsPdf', () => {
   it('produces a valid PDF with one page per card', async () => {
     const bytes = await generateCardsPdf(makeCards(3))
@@ -151,6 +177,12 @@ describe('generateCardPdf', () => {
     await expect(loadPdf(singleWithout)).resolves.toBeInstanceOf(PDFDocument)
     await expect(loadPdf(singleWith)).resolves.toBeInstanceOf(PDFDocument)
     await expect(loadPdf(together)).resolves.toBeInstanceOf(PDFDocument)
+  })
+
+  it('draws the artwork vignette as one smooth gradient image', async () => {
+    const document = await loadPdf(await generateCardPdf(makeCard({ image: TINY_PNG_DATA_URL })))
+
+    expect(embeddedImageSizes(document)).toContainEqual([1, 256])
   })
 
   it('does not throw for a 60 character title and a 240 character action', async () => {

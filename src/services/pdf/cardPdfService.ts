@@ -79,12 +79,24 @@ export async function generateCardsPdf(
 
   const document = await PDFDocument.create()
   const fonts = await embedCardFonts(document, options.fontId)
+  const artworkShade = await document.embedPng(dataUrlToUint8Array(ARTWORK_SHADE_PNG))
 
   for (const card of cards) {
     const localizedCard = getLocalizedCard(card, language)
     const page = document.addPage([cardWidth, cardHeight])
     const image = await embedArtwork(document, localizedCard)
-    drawCard(page, localizedCard, 0, cardHeight, cardWidth, cardHeight, fonts, image, language)
+    drawCard(
+      page,
+      localizedCard,
+      0,
+      cardHeight,
+      cardWidth,
+      cardHeight,
+      fonts,
+      image,
+      language,
+      artworkShade,
+    )
   }
 
   return document.save()
@@ -785,6 +797,7 @@ function drawCard(
   fonts: EmbeddedFonts,
   image: PDFImage | null,
   language: Language,
+  shade: PDFImage,
 ): void {
   const theme = getZoneTheme(card.zone)
   const labels = getCardTextLabels(language)
@@ -924,7 +937,17 @@ function drawCard(
   }
 
   /* ---- artwork ---- */
-  drawArtworkBox(ctx, theme, image, artworkBox, LAYOUT.artworkRadius * width, card, fonts, labels)
+  drawArtworkBox(
+    ctx,
+    theme,
+    image,
+    artworkBox,
+    LAYOUT.artworkRadius * width,
+    card,
+    fonts,
+    labels,
+    shade,
+  )
 
   /* ---- statistics ---- */
   drawStats(
@@ -1205,6 +1228,7 @@ function drawArtworkBox(
   card: Card,
   fonts: EmbeddedFonts,
   labels: CardTextLabels,
+  shade: PDFImage,
 ): void {
   const border = parseColor(theme.panelBorder)
 
@@ -1215,9 +1239,9 @@ function drawArtworkBox(
 
   if (image && image.width > 0 && image.height > 0) {
     drawArtworkImage(ctx, image, box)
-    drawArtworkShade(ctx, box)
+    drawArtworkShade(ctx, box, shade)
   } else {
-    drawArtworkPlaceholder(ctx, theme, box, card, fonts, labels)
+    drawArtworkPlaceholder(ctx, theme, box, card, fonts, labels, shade)
   }
 
   popClip(ctx.page)
@@ -1248,22 +1272,24 @@ function drawArtworkImage(ctx: CardRenderContext, image: PDFImage, box: Box): vo
   })
 }
 
-/** Bottom vignette of the artwork (52% -> 100% black in the stylesheet). */
-function drawArtworkShade(ctx: CardRenderContext, box: Box): void {
-  const bands = 10
-  const shadeHeight = box.height * 0.48
-  const bandHeight = shadeHeight / bands
-  const start = box.y + box.height - shadeHeight
+/**
+ * 1x256 black gradient with an alpha ramp of 0 -> 0.5, drawn over the bottom
+ * of the artwork. A real image keeps the vignette smooth: overlapping
+ * semi-transparent rectangles show their seams as horizontal lines.
+ */
+const ARTWORK_SHADE_PNG =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAEACAYAAAByPhyYAAAAHElEQVQ4y2NgQAaMTAwMDAxMo6xR1ihrlDUCWAAn/AJ6aGWvpwAAAABJRU5ErkJggg=='
 
-  for (let index = 0; index < bands; index += 1) {
-    const t = index / (bands - 1)
-    drawLocalRect(
-      ctx,
-      { x: box.x, y: start + index * bandHeight, width: box.width, height: bandHeight + 0.3 },
-      rgb(0, 0, 0),
-      0.5 * t,
-    )
-  }
+/** Bottom vignette of the artwork (52% -> 100% black in the stylesheet). */
+function drawArtworkShade(ctx: CardRenderContext, box: Box, shade: PDFImage): void {
+  const shadeHeight = box.height * 0.48
+
+  ctx.page.drawImage(shade, {
+    x: ctx.left + box.x,
+    y: ctx.top - box.y - box.height,
+    width: box.width,
+    height: shadeHeight,
+  })
 }
 
 function drawArtworkPlaceholder(
@@ -1273,6 +1299,7 @@ function drawArtworkPlaceholder(
   card: Card,
   fonts: EmbeddedFonts,
   labels: CardTextLabels,
+  shade: PDFImage,
 ): void {
   const deep = parseColor(theme.primaryDeep).color
   const primary = parseColor(theme.primary).color
@@ -1289,7 +1316,7 @@ function drawArtworkPlaceholder(
     4,
     0.06,
   )
-  drawArtworkShade(ctx, box)
+  drawArtworkShade(ctx, box, shade)
 
   const initialText = normalizeForFont(
     fonts.bold,
