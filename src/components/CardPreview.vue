@@ -8,8 +8,6 @@ import { getLocalizedCard } from '@/services/localization/cardLocalization'
 import { useLanguageStore } from '@/stores/languageStore'
 import { useSettingsStore } from '@/stores/settingsStore'
 import CardImage from '@/components/CardImage.vue'
-import CardStats from '@/components/CardStats.vue'
-import CardZoneBadge from '@/components/CardZoneBadge.vue'
 
 const props = withDefaults(
   defineProps<{
@@ -68,12 +66,20 @@ const rootStyle = computed(
       <div class="card__texture" aria-hidden="true" />
 
       <header class="card__header">
+        <div class="card__stat card__stat--attack">
+          <span class="card__stat-value">{{ displayCard.attack }}</span>
+          <span class="card__stat-label">{{ labels.attack }}</span>
+        </div>
+
         <div class="card__heading">
           <h3 class="card__title">{{ displayCard.title || labels.untitled }}</h3>
           <p v-if="displayCard.subtitle" class="card__subtitle">{{ displayCard.subtitle }}</p>
         </div>
 
-        <CardZoneBadge :zone="card.zone" :label="zoneLabel" />
+        <div class="card__stat card__stat--defense">
+          <span class="card__stat-value">{{ displayCard.defense }}</span>
+          <span class="card__stat-label">{{ labels.defense }}</span>
+        </div>
       </header>
 
       <div class="card__artwork">
@@ -86,28 +92,23 @@ const rootStyle = computed(
         <div class="card__artwork-glow" aria-hidden="true" />
       </div>
 
-      <CardStats
-        :attack="displayCard.attack"
-        :defense="displayCard.defense"
-        :attack-label="labels.attack"
-        :defense-label="labels.defense"
-      />
+      <footer class="card__footer">
+        <div class="card__stars" aria-hidden="true">
+          <span
+            v-for="(filled, index) in starSlots"
+            :key="index"
+            class="card__star"
+            :class="{ 'card__star--filled': filled }"
+          >
+            ★
+          </span>
+        </div>
 
-      <div class="card__action">
-        <p class="card__action-label">{{ labels.action }}</p>
-        <p class="card__action-text">{{ displayCard.action }}</p>
-      </div>
-
-      <div class="card__stars" aria-hidden="true">
-        <span
-          v-for="(filled, index) in starSlots"
-          :key="index"
-          class="card__star"
-          :class="{ 'card__star--filled': filled }"
-        >
-          ★
-        </span>
-      </div>
+        <div class="card__action">
+          <p class="card__action-label">{{ labels.action }}</p>
+          <p class="card__action-text">{{ displayCard.action }}</p>
+        </div>
+      </footer>
     </div>
   </article>
 </template>
