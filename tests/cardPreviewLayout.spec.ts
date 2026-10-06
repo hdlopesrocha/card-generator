@@ -91,6 +91,22 @@ describe('CardPreview layout', () => {
     expect(/(^|[;\s{])((?:min|max)-)?height\s*:/m.test(titleRule)).toBe(false)
   })
 
+  it('paints the artwork full-bleed underneath the corner overlays', () => {
+    const wrapper = mountCard(makeCard())
+
+    const artworkRule = cardCss.match(/^\.card__artwork\s*\{[^}]*\}/m)?.[0] ?? ''
+    expect(artworkRule).toContain('position: absolute')
+    expect(artworkRule).toContain('inset: 0')
+    expect(cardCss).toMatch(/\.card__frame > \.card__artwork\s*\{[^}]*z-index:\s*0/)
+
+    const footerRule = cardCss.match(/\.card__footer\s*\{[^}]*\}/)?.[0] ?? ''
+    expect(footerRule).toContain('margin-top: auto')
+
+    expect(wrapper.find('.card__artwork').exists()).toBe(true)
+    expect(wrapper.find('.card__header').exists()).toBe(true)
+    expect(wrapper.find('.card__footer').exists()).toBe(true)
+  })
+
   it('lets the action banner grow with its content', () => {
     const actionRule = cardCss.match(/\.card__action\s*\{[^}]*\}/)?.[0] ?? ''
     expect(/(^|[;\s{])((?:min|max)-)?height\s*:/m.test(actionRule)).toBe(false)
