@@ -80,6 +80,7 @@ Runs the Vitest suite once (`vitest run`); `npm run test:watch` runs it in watch
 - `tests/selectedLanguageEditing.spec.ts` - creating and saving a card written only in the selected (non-English) language.
 - `tests/csvLanguageFlow.spec.ts`, `tests/csvImages.spec.ts` - importing `sample.csv` through the UI with translations and bundled artwork, then exporting a PDF in the selected language.
 - `tests/demoMigration.spec.ts` - demo seeding includes bundled artwork; legacy demo cards stored before translations/artwork existed are upgraded in place.
+- `tests/demoSync.spec.ts` - hash-based demo sync: bundle changes refresh pristine stored cards, user edits are never overwritten.
 
 ## Project structure
 
@@ -126,6 +127,7 @@ card-generator/
 │   ├── services/
 │   │   ├── backup/backupService.ts           JSON backup export/import and validation
 │   │   ├── csv/csvService.ts                 CSV parsing, row validation and generation
+│   │   ├── demo/demoSync.ts                  Content-hash sync of bundled demo cards
 │   │   ├── image/bundledImages.ts            Lazy loader for sample artwork referenced by CSV
 │   │   ├── image/imageService.ts             Image validation and JPEG re-encoding
 │   │   ├── fonts/webFonts.ts                 Runtime @font-face registration for card fonts
@@ -155,6 +157,7 @@ card-generator/
     ├── csvImages.spec.ts       Bundled sample artwork import and PDF embedding
     ├── csvLanguageFlow.spec.ts UI CSV import with translations and language-specific PDF
     ├── demoMigration.spec.ts   Legacy demo card translation and artwork upgrade
+    ├── demoSync.spec.ts        Hash-based refresh of pristine demo cards on bundle changes
     ├── image.spec.ts           Image validation and detection tests
     ├── imageLibrary.spec.ts    Image repository and library store tests
     ├── imageView.spec.ts       Image page: sample listing, multi-upload and delete
@@ -188,6 +191,7 @@ Vue components  ->  Pinia stores  ->  services  ->  IndexedDB / PDF
 - Cards survive page refreshes and browser restarts, and remain scoped to the browser and origin that created them.
 - Failures are surfaced as `StorageUnavailableError` or a friendly generic error; the stores present localized, readable messages (the raw storage error text is "Local storage is not available in this browser.") and log technical details to the console.
 - Demo cards are seeded on first launch: when the database is empty and the `card-generator:demo-seeded` flag is absent, the store writes `Warrior` (ATTACK), `Tactician` (MIDFIELD) and `Guardian` (DEFENSE) from `src/data/sampleCards.ts`. The demo cards are regular cards, include their bundled artwork (`img1-img3.jpeg`) and translations for all six non-English languages, and can be edited or deleted.
+- Demo cards stay in sync with the bundle: every load compares each stored demo card against `src/data/sampleCards.ts` with an FNV-1a content hash (`src/services/demo/demoSync.ts`, baselines in `card-generator:demo-hashes`). Missing translations and artwork are always backfilled, and scalar fields (texts, stats, zone, stars, image reference) are adopted from the bundle when the baseline proves the user never customized the card. Any local edit opts the card out of future refreshes. Databases seeded before hash tracking use a one-time heuristic (untouched English texts are treated as app-owned), so stat-only edits on pre-existing demo cards may be refreshed once.
 
 ## Image handling
 

@@ -61,3 +61,10 @@ export const BACKUP_VERSION = 1
 
 /** localStorage key used to remember that demo cards were already seeded. */
 export const DEMO_SEEDED_KEY = 'card-generator:demo-seeded'
+
+/**
+ * localStorage key holding the last-synced content hash of each demo card
+ * (`{ [cardId]: hash }`). Used to refresh pristine demo cards when the
+ * bundled definitions change without touching cards the user customized.
+ */
+export const DEMO_HASHES_KEY = 'card-generator:demo-hashes'

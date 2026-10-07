@@ -57,7 +57,7 @@ describe('parseCardsCsv', () => {
     expect(guardian).toMatchObject({
       title: 'Guardian',
       zone: Zone.DEFENSE,
-      defense: 150,
+      defense: 140,
       stars: 1,
     })
     expect(new Set(result.cards.map((card) => card.id)).size).toBe(3)

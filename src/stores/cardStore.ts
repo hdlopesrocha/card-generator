@@ -1,10 +1,15 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import { DEMO_SEEDED_KEY } from '@/config/constants'
-import { createSampleCards, createSampleCardsWithImages } from '@/data/sampleCards'
+import { createSampleCardsWithImages } from '@/data/sampleCards'
 import { cardFromDraft, createCardId } from '@/models/Card'
 import type { Card, CardDraft } from '@/models/Card'
-import { resolveBundledImage } from '@/services/image/bundledImages'
+import {
+  collectDemoSync,
+  hashesForCards,
+  readDemoHashes,
+  writeDemoHashes,
+} from '@/services/demo/demoSync'
 import { getCardRepository, StorageUnavailableError } from '@/services/storage/indexedDb'
 import { validateCard } from '@/services/validation/cardValidation'
 import { useLanguageStore } from '@/stores/languageStore'
@@ -41,64 +46,6 @@ function markDemoSeeded(): void {
 
 function describeFailure(caught: unknown, storageMessage: string, fallback: string): string {
   return caught instanceof StorageUnavailableError ? storageMessage : fallback
-}
-
-/**
- * Upgrades demo cards stored by older versions (before translations or demo
- * artwork existed) by filling in the languages and image shipped with the
- * app. Only pristine demo cards are touched: once the user edits the English
- * text, the card is left alone.
- */
-async function collectDemoUpgrades(loaded: Card[]): Promise<Card[]> {
-  const samples = new Map(createSampleCards().map((card) => [card.id, card]))
-  const upgraded: Card[] = []
-
-  for (const card of loaded) {
-    const sample = samples.get(card.id)
-    if (!sample) continue
-
-    const isPristine =
-      card.title === sample.title &&
-      card.subtitle === sample.subtitle &&
-      card.action === sample.action
-    if (!isPristine) continue
-
-    const translations = { ...(card.translations ?? {}) }
-    let changed = false
-
-    for (const [language, entry] of Object.entries(sample.translations)) {
-      const current = translations[language as keyof typeof translations]
-      const isEmpty =
-        !current || (!current.title.trim() && !current.subtitle.trim() && !current.action.trim())
-
-      if (isEmpty) {
-        translations[language as keyof typeof translations] = entry
-        changed = true
-      }
-    }
-
-    let image = card.image
-    let imageRef = card.imageRef ?? null
-
-    if (!image && sample.imageRef) {
-      try {
-        const dataUrl = await resolveBundledImage(sample.imageRef)
-        if (dataUrl) {
-          image = dataUrl
-          imageRef = sample.imageRef
-          changed = true
-        }
-      } catch {
-        // Keep the card untouched when the artwork cannot be resolved.
-      }
-    }
-
-    if (changed) {
-      upgraded.push({ ...card, translations, image, imageRef })
-    }
-  }
-
-  return upgraded
 }
 
 export const useCardStore = defineStore('cards', () => {
@@ -149,16 +96,22 @@ export const useCardStore = defineStore('cards', () => {
       const total = await repository.count()
 
       if (total === 0 && !wasDemoSeeded()) {
-        await repository.bulkPut(await createSampleCardsWithImages())
+        const samples = await createSampleCardsWithImages()
+        await repository.bulkPut(samples)
+        writeDemoHashes(hashesForCards(samples))
         markDemoSeeded()
       }
 
       const loaded = await repository.getAll()
-      const upgrades = await collectDemoUpgrades(loaded)
+      const { updates, hashes, hashesChanged } = await collectDemoSync(loaded, readDemoHashes())
 
-      if (upgrades.length > 0) {
-        await repository.bulkPut(upgrades)
-        const byId = new Map(upgrades.map((card) => [card.id, card]))
+      if (hashesChanged) {
+        writeDemoHashes(hashes)
+      }
+
+      if (updates.length > 0) {
+        await repository.bulkPut(updates)
+        const byId = new Map(updates.map((card) => [card.id, card]))
         cards.value = loaded.map((card) => byId.get(card.id) ?? card)
       } else {
         cards.value = loaded
@@ -252,12 +205,21 @@ export const useCardStore = defineStore('cards', () => {
     try {
       const repository = getCardRepository()
       const existingIds = new Set(cards.value.map((card) => card.id))
-      const restored = (await createSampleCardsWithImages()).map((card) =>
+      const samples = await createSampleCardsWithImages()
+      const restored = samples.map((card) =>
         existingIds.has(card.id) ? { ...card, id: createCardId() } : card,
       )
 
       await repository.bulkPut(restored)
       mergeCards(restored)
+
+      const freshSamples = restored.filter((card) =>
+        samples.some((sample) => sample.id === card.id),
+      )
+      if (freshSamples.length > 0) {
+        writeDemoHashes({ ...readDemoHashes(), ...hashesForCards(freshSamples) })
+      }
+
       return restored.length
     } catch (caught) {
       console.error('Failed to restore the demo cards.', caught)
