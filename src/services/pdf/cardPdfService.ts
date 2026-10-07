@@ -34,7 +34,7 @@ import fontkit from '@pdf-lib/fontkit'
 
 import { CARD_FONT_SCALE, PDF_CONSTANTS } from '@/config/constants'
 import { getCardFont } from '@/config/fonts'
-import { getCardTextLabels, getZoneLabel, translate, type CardTextLabels } from '@/config/languages'
+import { getCardTextLabels, translate, type CardTextLabels } from '@/config/languages'
 import { getZoneTheme, type ZoneTheme } from '@/config/zones'
 import type { Card } from '@/models/Card'
 import { normalizeStars } from '@/models/Card'
@@ -82,7 +82,10 @@ export async function generateCardsPdf(
 
   const document = await PDFDocument.create()
   const fonts = await embedCardFonts(document, options.fontId)
-  const artworkShade = await document.embedPng(dataUrlToUint8Array(ARTWORK_SHADE_PNG))
+  const artworkShades: ArtworkShades = {
+    top: await document.embedPng(dataUrlToUint8Array(ARTWORK_SHADE_TOP_PNG)),
+    bottom: await document.embedPng(dataUrlToUint8Array(ARTWORK_SHADE_BOTTOM_PNG)),
+  }
 
   for (const card of cards) {
     const localizedCard = getLocalizedCard(card, language)
@@ -98,7 +101,7 @@ export async function generateCardsPdf(
       fonts,
       image,
       language,
-      artworkShade,
+      artworkShades,
       fontScale,
     )
   }
@@ -172,49 +175,48 @@ const LAYOUT = {
   frameInset: 0.024,
   frameRadius: 0.028,
   framePadding: 0.034,
-  sectionGap: 0.024,
-  titleSize: 0.084,
-  titleLineHeight: 1.02,
-  titleMaxLines: 2,
-  subtitleSize: 0.04,
-  subtitleTracking: 0.16,
-  subtitleMargin: 0.011,
-  badgeTextSize: 0.034,
-  badgeTracking: 0.14,
-  badgePadX: 0.022,
-  badgePadY: 0.012,
-  badgeDot: 0.016,
-  badgeDotGap: 0.014,
-  statsGap: 0.022,
-  statPadX: 0.024,
-  statPadY: 0.019,
-  statRadius: 0.02,
-  statIcon: 0.074,
-  statIconRadius: 0.016,
-  statIconGap: 0.02,
-  statLabelSize: 0.029,
-  statLabelTracking: 0.2,
-  statValueSize: 0.072,
+  headerGap: 0.02,
+  titlePadX: 0.022,
+  titlePadY: 0.015,
+  titleRadius: 0.018,
+  titleSize: 0.076,
+  titleLineHeight: 1.05,
+  headingGap: 0.012,
+  subtitlePadX: 0.022,
+  subtitlePadY: 0.01,
+  subtitleRadius: 0.014,
+  subtitleSize: 0.037,
+  subtitleTracking: 0.1,
+  subtitleLineHeight: 1.4,
+  counterMinWidth: 0.13,
+  counterPadX: 0.018,
+  counterPadY: 0.014,
+  counterRadius: 0.02,
+  counterValueSize: 0.082,
+  counterLabelSize: 0.029,
+  counterLabelTracking: 0.18,
+  counterGap: 0.004,
+  footerGap: 0.02,
+  starsPadX: 0.016,
+  starsPadY: 0.014,
+  starsRadius: 0.02,
+  starGap: 0.006,
   actionPadX: 0.026,
-  actionPadY: 0.022,
+  actionPadY: 0.02,
   actionRadius: 0.02,
   actionLabelSize: 0.029,
   actionLabelTracking: 0.24,
-  actionLabelGap: 0.009,
-  actionTextSize: 0.039,
-  actionLineHeight: 1.34,
+  actionLabelGap: 0.007,
+  actionTextSize: 0.042,
+  actionLineHeight: 1.25,
   actionMaxLines: 6,
-  artworkMinHeight: 0.44,
-  artworkRadius: 0.022,
-  starRadius: 0.03,
-  starGap: 0.018,
+  starRadius: 0.024,
 }
 
 const CONTENT_INSET = LAYOUT.frameInset + LAYOUT.framePadding
 const REFERENCE_ASPECT = 1.4
 const REFERENCE_CONTENT_RATIO = REFERENCE_ASPECT - CONTENT_INSET * 2
 const TEXT_ASCENT = 0.72
-const TEXT_CENTER_OFFSET = 0.36
 const MIN_ACTION_FONT_SIZE = 4.5
 const GRADIENT_BANDS = 40
 const BEZIER_CIRCLE = 0.5522847498307936
@@ -223,21 +225,27 @@ const CARD_SURFACE_COLOR = '#ffffff'
 
 /**
  * Sum of every vertical section at full scale. Used to compute the global
- * vertical scale so short/wide cards never overflow their frame.
+ * vertical scale so short/wide cards never overflow their frame. The artwork
+ * is a full-bleed background here, so only the header and footer count.
  */
+const TITLE_WORST_LINES = 4
+
 const WORST_CONTENT_RATIO =
-  LAYOUT.titleSize * LAYOUT.titleMaxLines * LAYOUT.titleLineHeight +
-  LAYOUT.subtitleMargin +
-  LAYOUT.subtitleSize * 1.4 +
-  (LAYOUT.statPadY * 2 +
-    Math.max(LAYOUT.statIcon, LAYOUT.statLabelSize * 1.2 + LAYOUT.statValueSize * 1.05)) +
-  LAYOUT.sectionGap * 4 +
-  LAYOUT.artworkMinHeight +
-  (LAYOUT.actionPadY * 2 +
-    LAYOUT.actionLabelSize +
-    LAYOUT.actionLabelGap +
-    LAYOUT.actionMaxLines * LAYOUT.actionTextSize * LAYOUT.actionLineHeight) +
-  LAYOUT.starRadius * 2
+  Math.max(
+    LAYOUT.counterPadY * 2 + LAYOUT.counterValueSize + LAYOUT.counterGap + LAYOUT.counterLabelSize,
+    LAYOUT.titlePadY * 2 +
+      TITLE_WORST_LINES * LAYOUT.titleSize * LAYOUT.titleLineHeight +
+      LAYOUT.headingGap +
+      LAYOUT.subtitlePadY * 2 +
+      LAYOUT.subtitleSize * LAYOUT.subtitleLineHeight,
+  ) +
+  Math.max(
+    LAYOUT.starsPadY * 2 + 3 * LAYOUT.starRadius * 1.81 + LAYOUT.starGap * 2,
+    LAYOUT.actionPadY * 2 +
+      LAYOUT.actionLabelSize +
+      LAYOUT.actionLabelGap +
+      LAYOUT.actionMaxLines * LAYOUT.actionTextSize * LAYOUT.actionLineHeight,
+  )
 
 /* ------------------------------------------------------------------ */
 /* Drawing primitives                                                  */
@@ -332,6 +340,12 @@ interface EmbeddedFonts {
   regular: CardTextFont
   bold: CardTextFont
   oblique: CardTextFont
+}
+
+/** Top and bottom readability gradients for the full-bleed artwork. */
+interface ArtworkShades {
+  top: PDFImage
+  bottom: PDFImage
 }
 
 interface CardRenderContext {
@@ -654,34 +668,6 @@ function ellipsize(text: string, font: CardTextFont, size: number, maxWidth: num
   return text.slice(0, low).trimEnd() + ellipsis
 }
 
-function fitTitle(
-  text: string,
-  font: CardTextFont,
-  maxSize: number,
-  maxWidth: number,
-  maxLines: number,
-): { lines: string[]; size: number } {
-  const normalized = normalizeForFont(font, text).trim()
-  if (!normalized) return { lines: [], size: maxSize }
-
-  const minSize = Math.max(7, maxSize * 0.45)
-  let size = maxSize
-  let lines = wrapText(normalized, font, size, maxWidth)
-
-  while (lines.length > maxLines && size > minSize) {
-    size = Math.max(minSize, size - 0.5)
-    lines = wrapText(normalized, font, size, maxWidth)
-  }
-
-  if (lines.length > maxLines) {
-    lines = lines.slice(0, maxLines)
-    const lastIndex = lines.length - 1
-    lines[lastIndex] = ellipsize(lines[lastIndex], font, size, maxWidth)
-  }
-
-  return { lines, size }
-}
-
 function fitActionLines(
   text: string,
   font: CardTextFont,
@@ -809,223 +795,367 @@ function drawCard(
   fonts: EmbeddedFonts,
   image: PDFImage | null,
   language: Language,
-  shade: PDFImage,
+  shades: ArtworkShades,
   fontScale: number,
 ): void {
   const theme = getZoneTheme(card.zone)
   const labels = getCardTextLabels(language)
-  const ctx: CardRenderContext = { page, left, top, width, height, fontScale }
   const contentRatio = height / width - CONTENT_INSET * 2
   const vScale = clamp(contentRatio / WORST_CONTENT_RATIO, 0.3, 1)
+  const ctx: CardRenderContext = { page, left, top, width, height, fontScale: vScale * fontScale }
 
   drawCardBackground(ctx, theme)
-  drawCardFrame(ctx, theme)
+  drawArtworkFullBleed(ctx, theme, frameBox(ctx), image, card, fonts, labels, shades)
 
   const contentX = CONTENT_INSET * width
   const contentTop = CONTENT_INSET * width
   const contentWidth = width - contentX * 2
-  const contentHeight = height - contentTop * 2
-  const gap = LAYOUT.sectionGap * width * vScale
+  const contentBottom = height - CONTENT_INSET * width
 
-  /* ---- zone badge metrics ---- */
-  const badgeFontSize = LAYOUT.badgeTextSize * width * vScale * fontScale
-  const badgeLabel = normalizeForFont(fonts.bold, getZoneLabel(card.zone, language).toUpperCase())
-  const badgeTracking = LAYOUT.badgeTracking * badgeFontSize
-  const badgeTextWidth = trackedTextWidth(fonts.bold, badgeLabel, badgeFontSize, badgeTracking)
-  const badgeDotDiameter = LAYOUT.badgeDot * width
-  const badgeHeight =
-    LAYOUT.badgePadY * 2 * width * vScale +
-    Math.max(badgeDotDiameter, badgeFontSize * 1.2)
-  const badgeWidth =
-    LAYOUT.badgePadX * 2 * width + badgeDotDiameter + LAYOUT.badgeDotGap * width + badgeTextWidth
+  const headerBottom = drawHeader(ctx, theme, fonts, labels, card, contentX, contentTop, contentWidth)
+  drawFooter(ctx, theme, fonts, labels, card, contentX, headerBottom, contentBottom, contentWidth)
 
-  /* ---- header ---- */
-  const columnWidth = Math.max(1, contentWidth - gap - badgeWidth)
-  const titleBaseSize = LAYOUT.titleSize * width * vScale * fontScale
-  const titleText = card.title.trim() ? card.title : labels.untitled
-  const title = fitTitle(titleText, fonts.bold, titleBaseSize, columnWidth, LAYOUT.titleMaxLines)
-  const titleLineHeight = title.size * LAYOUT.titleLineHeight
-  const titleBlockHeight = title.lines.length * titleLineHeight
-  const subtitleSize = LAYOUT.subtitleSize * width * vScale * fontScale
-  const subtitle = card.subtitle
-    ? ellipsize(
-        normalizeForFont(fonts.oblique, card.subtitle.toUpperCase()),
-        fonts.oblique,
-        subtitleSize,
-        columnWidth,
-      )
-    : ''
-  const subtitleBlockHeight = subtitle
-    ? LAYOUT.subtitleMargin * width * vScale + subtitleSize * 1.4
-    : 0
-  const headerHeight = Math.max(titleBlockHeight + subtitleBlockHeight, badgeHeight)
+  // Frame border and corner ticks sit on top of the artwork and the content.
+  drawCardFrame(ctx, theme)
+}
 
-  /* ---- statistics ---- */
-  const statLabelSize = LAYOUT.statLabelSize * width * vScale * fontScale
-  const statValueSize = LAYOUT.statValueSize * width * vScale * fontScale
-  const statIconSize = LAYOUT.statIcon * width * vScale
-  const statsPanelWidth = (contentWidth - LAYOUT.statsGap * width) / 2
-  const statBodyHeight = statLabelSize * 1.2 + statValueSize * 1.05
-  const statsHeight =
-    LAYOUT.statPadY * 2 * width * vScale + Math.max(statIconSize, statBodyHeight)
+/** The frame box shared by the background, the artwork and the chrome. */
+function frameBox(ctx: CardRenderContext): Box {
+  const inset = LAYOUT.frameInset * ctx.width
+  return {
+    x: inset,
+    y: inset,
+    width: ctx.width - inset * 2,
+    height: ctx.height - inset * 2,
+  }
+}
 
-  /* ---- stars ---- */
-  const starRadius = LAYOUT.starRadius * width * vScale * fontScale
-  const starGap = LAYOUT.starGap * width * vScale
-  const starsHeight = starRadius * 2
+/** Attack/defense counter colours (universal, independent of the zone). */
+const COUNTER_ATTACK_FILL = '#e0352b'
+const COUNTER_DEFENSE_FILL = '#2563eb'
+const COUNTER_BORDER = 'rgba(255, 255, 255, 0.34)'
+const SUBTITLE_INK = '#131722'
 
-  /* ---- action ---- */
-  const actionPadX = LAYOUT.actionPadX * width
-  const actionPadY = LAYOUT.actionPadY * width * vScale
-  const actionLabelSize = LAYOUT.actionLabelSize * width * vScale * fontScale
-  const actionLabelGap = LAYOUT.actionLabelGap * width * vScale
-  const actionInnerWidth = Math.max(1, contentWidth - actionPadX * 2)
-  const artworkMinHeight = LAYOUT.artworkMinHeight * width * vScale
-  const maxActionHeight = Math.max(
-    actionPadY * 2 + actionLabelSize + actionLabelGap + MIN_ACTION_FONT_SIZE,
-    contentHeight - headerHeight - statsHeight - starsHeight - gap * 4 - artworkMinHeight,
+function drawCounter(
+  ctx: CardRenderContext,
+  box: Box,
+  fill: RGB,
+  value: string,
+  label: string,
+  fonts: EmbeddedFonts,
+  valueSize: number,
+  labelSize: number,
+  labelTracking: number,
+): void {
+  const border = parseColor(COUNTER_BORDER)
+  drawLocalRoundedRect(ctx, box, LAYOUT.counterRadius * ctx.width, {
+    color: fill,
+    opacity: 1,
+    borderColor: border.color,
+    borderOpacity: border.opacity,
+    borderWidth: Math.max(0.4, 0.0025 * ctx.width),
+  })
+
+  const valueWidth = measure(fonts.bold, value, valueSize)
+  const labelWidth = trackedTextWidth(fonts.bold, label, labelSize, labelTracking)
+  const innerHeight = box.height - LAYOUT.counterPadY * ctx.width * 2
+  const textHeight = valueSize + LAYOUT.counterGap * ctx.width + labelSize
+  const valueTop = box.y + LAYOUT.counterPadY * ctx.width + Math.max(0, (innerHeight - textHeight) / 2)
+
+  drawLocalText(
+    ctx,
+    value,
+    box.x + (box.width - valueWidth) / 2,
+    valueTop,
+    fonts.bold,
+    valueSize,
+    rgb(1, 1, 1),
   )
-  const actionInnerHeight = Math.max(
+
+  const labelBaseline =
+    ctx.top - (valueTop + valueSize + LAYOUT.counterGap * ctx.width) - labelSize * TEXT_ASCENT
+  drawTrackedText(
+    ctx,
+    label,
+    box.x + (box.width - labelWidth) / 2,
+    labelBaseline,
+    fonts.bold,
+    labelSize,
+    rgb(1, 1, 1),
+    0.92,
+    labelTracking,
+  )
+}
+
+/**
+ * Header overlay: attack counter, title banner (grows with the title) and
+ * optional subtitle plate, defense counter. Returns the bottom edge.
+ */
+function drawHeader(
+  ctx: CardRenderContext,
+  theme: ZoneTheme,
+  fonts: EmbeddedFonts,
+  labels: CardTextLabels,
+  card: Card,
+  contentX: number,
+  contentTop: number,
+  contentWidth: number,
+): number {
+  const { width, fontScale } = ctx
+  const valueSize = LAYOUT.counterValueSize * width * fontScale
+  const counterLabelSize = LAYOUT.counterLabelSize * width * fontScale
+  const counterTracking = LAYOUT.counterLabelTracking * counterLabelSize
+  const padX = LAYOUT.counterPadX * width
+  const padY = LAYOUT.counterPadY * width
+
+  const atkValue = normalizeForFont(fonts.bold, formatStat(card.attack))
+  const defValue = normalizeForFont(fonts.bold, formatStat(card.defense))
+  const atkLabel = normalizeForFont(fonts.bold, labels.attack.toUpperCase())
+  const defLabel = normalizeForFont(fonts.bold, labels.defense.toUpperCase())
+
+  const atkW =
+    Math.max(
+      LAYOUT.counterMinWidth * width,
+      measure(fonts.bold, atkValue, valueSize),
+      trackedTextWidth(fonts.bold, atkLabel, counterLabelSize, counterTracking),
+    ) + padX * 2
+  const defW =
+    Math.max(
+      LAYOUT.counterMinWidth * width,
+      measure(fonts.bold, defValue, valueSize),
+      trackedTextWidth(fonts.bold, defLabel, counterLabelSize, counterTracking),
+    ) + padX * 2
+  const counterH = padY * 2 + valueSize + LAYOUT.counterGap * width + counterLabelSize
+
+  drawCounter(
+    ctx,
+    { x: contentX, y: contentTop, width: atkW, height: counterH },
+    parseColor(COUNTER_ATTACK_FILL).color,
+    atkValue,
+    atkLabel,
+    fonts,
+    valueSize,
+    counterLabelSize,
+    counterTracking,
+  )
+  drawCounter(
+    ctx,
+    { x: contentX + contentWidth - defW, y: contentTop, width: defW, height: counterH },
+    parseColor(COUNTER_DEFENSE_FILL).color,
+    defValue,
+    defLabel,
+    fonts,
+    valueSize,
+    counterLabelSize,
+    counterTracking,
+  )
+
+  const gap = LAYOUT.headerGap * width
+  const titleX = contentX + atkW + gap
+  const titleW = Math.max(1, contentWidth - atkW - defW - gap * 2)
+  const titleSize = LAYOUT.titleSize * width * fontScale
+  const titleInner = Math.max(1, titleW - LAYOUT.titlePadX * width * 2)
+  const titleText = card.title.trim() ? card.title : labels.untitled
+  const titleLines = wrapText(titleText, fonts.bold, titleSize, titleInner)
+  const bannerH = LAYOUT.titlePadY * width * 2 + titleLines.length * titleSize * LAYOUT.titleLineHeight
+
+  const primary = parseColor(theme.primary)
+  const lightBorder = parseColor(theme.primaryLight)
+  drawLocalRoundedRect(
+    ctx,
+    { x: titleX, y: contentTop, width: titleW, height: bannerH },
+    LAYOUT.titleRadius * width,
+    {
+      color: primary.color,
+      opacity: 1,
+      borderColor: lightBorder.color,
+      borderOpacity: lightBorder.opacity * 0.6,
+      borderWidth: Math.max(0.4, 0.0025 * width),
+    },
+  )
+
+  let lineTop = contentTop + LAYOUT.titlePadY * width
+  for (const line of titleLines) {
+    const lineWidth = measure(fonts.bold, line, titleSize)
+    drawLocalText(
+      ctx,
+      line,
+      titleX + (titleW - lineWidth) / 2,
+      lineTop,
+      fonts.bold,
+      titleSize,
+      rgb(1, 1, 1),
+    )
+    lineTop += titleSize * LAYOUT.titleLineHeight
+  }
+
+  let headingH = bannerH
+  if (card.subtitle) {
+    const subSize = LAYOUT.subtitleSize * width * fontScale
+    const subTracking = LAYOUT.subtitleTracking * subSize
+    const subLines = wrapText(card.subtitle.toUpperCase(), fonts.bold, subSize, titleInner)
+    const plateY = contentTop + bannerH + LAYOUT.headingGap * width
+    const plateH = LAYOUT.subtitlePadY * width * 2 + subLines.length * subSize * LAYOUT.subtitleLineHeight
+    drawLocalRoundedRect(
+      ctx,
+      { x: titleX, y: plateY, width: titleW, height: plateH },
+      LAYOUT.subtitleRadius * width,
+      { color: rgb(1, 1, 1), opacity: 0.94 },
+    )
+
+    const ink = parseColor(SUBTITLE_INK).color
+    let subTop = plateY + LAYOUT.subtitlePadY * width
+    for (const line of subLines) {
+      const lineWidth = trackedTextWidth(fonts.bold, line, subSize, subTracking)
+      const baseline = ctx.top - subTop - subSize * TEXT_ASCENT
+      drawTrackedText(
+        ctx,
+        line,
+        titleX + (titleW - lineWidth) / 2,
+        baseline,
+        fonts.bold,
+        subSize,
+        ink,
+        1,
+        subTracking,
+      )
+      subTop += subSize * LAYOUT.subtitleLineHeight
+    }
+    headingH = bannerH + LAYOUT.headingGap * width + plateH
+  }
+
+  return contentTop + Math.max(counterH, headingH)
+}
+
+/**
+ * Footer overlay anchored to the bottom: star column on the left, action
+ * banner filling the rest. The action text shrinks to the available space so
+ * it never escapes the frame.
+ */
+function drawFooter(
+  ctx: CardRenderContext,
+  theme: ZoneTheme,
+  fonts: EmbeddedFonts,
+  labels: CardTextLabels,
+  card: Card,
+  contentX: number,
+  headerBottom: number,
+  contentBottom: number,
+  contentWidth: number,
+): void {
+  const { width, fontScale } = ctx
+  const starScale = LAYOUT.starRadius * width * fontScale
+  const starGap = LAYOUT.starGap * width
+  const starW = starScale * 1.9
+  const starH = starScale * 1.81
+  const starsPadX = LAYOUT.starsPadX * width
+  const starsPadY = LAYOUT.starsPadY * width
+  const starsW = starsPadX * 2 + starW
+  const starsH = starsPadY * 2 + starH * 3 + starGap * 2
+
+  const actionLabelSize = LAYOUT.actionLabelSize * width * fontScale
+  const actionPadX = LAYOUT.actionPadX * width
+  const actionPadY = LAYOUT.actionPadY * width
+  const footerGap = LAYOUT.footerGap * width
+
+  const available = Math.max(1, contentBottom - headerBottom - footerGap)
+  const actionInnerW = Math.max(1, contentWidth - starsW - footerGap - actionPadX * 2)
+  const maxActionInnerH = Math.max(
     1,
-    maxActionHeight - actionPadY * 2 - actionLabelSize - actionLabelGap,
+    available - actionPadY * 2 - actionLabelSize - LAYOUT.actionLabelGap * width,
   )
   const action = fitActionLines(
-    card.action,
-    fonts.regular,
-    actionInnerWidth,
-    actionInnerHeight,
-    LAYOUT.actionTextSize * width * vScale * fontScale,
+    card.action.toUpperCase(),
+    fonts.bold,
+    actionInnerW,
+    maxActionInnerH,
+    LAYOUT.actionTextSize * width * fontScale,
   )
-  const actionHeight = Math.min(
-    maxActionHeight,
+  const actionH =
     actionPadY * 2 +
-      actionLabelSize +
-      actionLabelGap +
-      action.lines.length * action.size * LAYOUT.actionLineHeight,
-  )
-  const artworkHeight = Math.max(
-    0,
-    contentHeight - headerHeight - statsHeight - actionHeight - starsHeight - gap * 4,
-  )
+    actionLabelSize +
+    LAYOUT.actionLabelGap * width +
+    action.lines.length * action.size * LAYOUT.actionLineHeight
 
-  const artworkBox: Box = {
-    x: contentX,
-    y: contentTop + headerHeight + gap,
-    width: contentWidth,
-    height: artworkHeight,
-  }
-  const statsTop = artworkBox.y + artworkBox.height + gap
-  const actionTop = statsTop + statsHeight + gap
-  const starsTop = actionTop + actionHeight + gap
+  const footerH = Math.max(starsH, actionH)
+  const footerTop = contentBottom - footerH
+  const actionX = contentX + starsW + footerGap
+  const actionW = contentWidth - starsW - footerGap
 
-  /* ---- header ---- */
-  const badgeBox: Box = {
-    x: contentX + contentWidth - badgeWidth,
-    y: contentTop,
-    width: badgeWidth,
-    height: badgeHeight,
-  }
-  drawZoneBadge(ctx, theme, badgeBox, fonts.bold, badgeLabel, badgeFontSize, badgeTracking, badgeDotDiameter)
-
-  let lineTop = contentTop
-  for (const line of title.lines) {
-    drawLocalText(ctx, line, contentX, lineTop, fonts.bold, title.size, parseColor(theme.ink).color)
-    lineTop += titleLineHeight
-  }
-
-  if (subtitle) {
-    const subtitleTop = contentTop + titleBlockHeight + LAYOUT.subtitleMargin * width * vScale
-    const subtitleBaseline = ctx.top - subtitleTop - subtitleSize * TEXT_ASCENT
-    drawTrackedText(
-      ctx,
-      subtitle,
-      contentX,
-      subtitleBaseline,
-      fonts.oblique,
-      subtitleSize,
-      parseColor(theme.inkMuted).color,
-      1,
-      LAYOUT.subtitleTracking * subtitleSize,
-    )
-  }
-
-  /* ---- artwork ---- */
-  drawArtworkBox(
+  const border = parseColor(theme.panelBorder)
+  drawLocalRoundedRect(
     ctx,
-    theme,
-    image,
-    artworkBox,
-    LAYOUT.artworkRadius * width,
-    card,
-    fonts,
-    labels,
-    shade,
+    { x: contentX, y: footerTop, width: starsW, height: footerH },
+    LAYOUT.starsRadius * width,
+    {
+      color: rgb(0, 0, 0),
+      opacity: 0.35,
+      borderColor: border.color,
+      borderOpacity: border.opacity,
+      borderWidth: Math.max(0.4, 0.0025 * width),
+    },
   )
 
-  /* ---- statistics ---- */
-  drawStats(
+  const filledColor = parseColor(theme.accent).color
+  const starsTotalH = starH * 3 + starGap * 2
+  const starsTop = footerTop + (footerH - starsTotalH) / 2
+  const totalStars = normalizeStars(card.stars)
+  for (let index = 0; index < 3; index += 1) {
+    const centerX = ctx.left + contentX + starsW / 2
+    // The star path spans -1..0.809 vertically; offset by -starScale so the
+    // top vertex lands exactly on the slot top.
+    const originY = ctx.top - (starsTop + index * (starH + starGap)) - starScale
+    const filled = index < totalStars
+    ctx.page.drawSvgPath(STAR_PATH, {
+      x: centerX,
+      y: originY,
+      scale: starScale,
+      color: filled ? filledColor : rgb(1, 1, 1),
+      opacity: filled ? 1 : 0.16,
+    })
+  }
+
+  const zone = parseColor(theme.primary)
+  const zoneDark = parseColor(theme.primaryDark)
+  drawLocalRoundedRect(
     ctx,
-    theme,
-    fonts,
-    statsTop,
-    statsHeight,
-    statsPanelWidth,
-    statIconSize,
-    statBodyHeight,
-    statLabelSize,
-    statValueSize,
-    card,
-    labels,
+    { x: actionX, y: footerTop, width: actionW, height: footerH },
+    LAYOUT.actionRadius * width,
+    {
+      color: rgb(1, 1, 1),
+      opacity: 0.95,
+      borderColor: zone.color,
+      borderOpacity: 1,
+      borderWidth: 1.5,
+    },
   )
 
-  /* ---- action ---- */
-  const actionBox: Box = { x: contentX, y: actionTop, width: contentWidth, height: actionHeight }
-  drawAction(ctx, theme, fonts, actionBox, actionPadX, actionPadY, actionLabelSize, actionLabelGap, action, labels)
+  const actionLabel = normalizeForFont(fonts.bold, labels.action.toUpperCase())
+  const actionLabelTracking = LAYOUT.actionLabelTracking * actionLabelSize
+  const labelBaseline = ctx.top - (footerTop + actionPadY) - actionLabelSize * TEXT_ASCENT
+  drawTrackedText(
+    ctx,
+    actionLabel,
+    actionX + actionPadX,
+    labelBaseline,
+    fonts.bold,
+    actionLabelSize,
+    zoneDark.color,
+    1,
+    actionLabelTracking,
+  )
 
-  /* ---- stars ---- */
-  drawStars(ctx, theme, starsTop, starsHeight, starRadius, starGap, card)
+  let lineTop = footerTop + actionPadY + actionLabelSize + LAYOUT.actionLabelGap * width
+  const lineHeight = action.size * LAYOUT.actionLineHeight
+  for (const line of action.lines) {
+    drawLocalText(ctx, line, actionX + actionPadX, lineTop, fonts.bold, action.size, zoneDark.color)
+    lineTop += lineHeight
+  }
 }
 
 /** Unit five-point star centred at (0,0) in SVG coordinates (points up). */
 const STAR_PATH =
   'M 0 -1 L 0.2245 -0.309 L 0.9511 -0.309 L 0.3633 0.118 L 0.5878 0.809 L 0 0.382 L -0.5878 0.809 L -0.3633 0.118 L -0.9511 -0.309 L -0.2245 -0.309 Z'
-
-function drawStars(
-  ctx: CardRenderContext,
-  theme: ZoneTheme,
-  starsTop: number,
-  starsHeight: number,
-  starRadius: number,
-  starGap: number,
-  card: Card,
-): void {
-  const { page, left, width } = ctx
-  const totalStars = normalizeStars(card.stars)
-  const contentX = CONTENT_INSET * width
-  const contentWidth = width - contentX * 2
-  const totalWidth = starRadius * 6 + starGap * 2
-  const centerY = ctx.top - (starsTop + starsHeight / 2)
-  const filledColor = parseColor(theme.accent).color
-  const emptyColor = parseColor(theme.inkMuted).color
-
-  for (let index = 0; index < 3; index += 1) {
-    const centerX =
-      left +
-      contentX +
-      (contentWidth - totalWidth) / 2 +
-      starRadius +
-      index * (starRadius * 2 + starGap)
-    const filled = index < totalStars
-
-    page.drawSvgPath(STAR_PATH, {
-      x: centerX,
-      y: centerY,
-      scale: starRadius,
-      color: filled ? filledColor : emptyColor,
-      opacity: filled ? 1 : 0.2,
-    })
-  }
-}
 
 function drawCardBackground(ctx: CardRenderContext, theme: ZoneTheme): void {
   const { width, height } = ctx
@@ -1123,26 +1253,8 @@ function drawRadialGlow(
 }
 
 function drawCardFrame(ctx: CardRenderContext, theme: ZoneTheme): void {
-  const inset = LAYOUT.frameInset * ctx.width
+  const frame = frameBox(ctx)
   const radius = LAYOUT.frameRadius * ctx.width
-  const frame: Box = {
-    x: inset,
-    y: inset,
-    width: ctx.width - inset * 2,
-    height: ctx.height - inset * 2,
-  }
-
-  drawLocalRoundedRect(ctx, frame, radius, { color: rgb(0, 0, 0), opacity: 0.06 })
-
-  const pdfFrame = toPdfBox(ctx, frame)
-  pushRoundedRectClip(ctx.page, pdfFrame.x, pdfFrame.y, pdfFrame.width, pdfFrame.height, radius)
-  drawLocalRect(
-    ctx,
-    { x: frame.x, y: frame.y, width: frame.width, height: frame.height * 0.45 },
-    rgb(1, 1, 1),
-    0.025,
-  )
-  popClip(ctx.page)
 
   const frameBorder = parseColor('rgba(255, 255, 255, 0.16)')
   drawLocalRoundedRect(ctx, frame, radius, {
@@ -1185,85 +1297,33 @@ function drawCornerTicks(ctx: CardRenderContext, theme: ZoneTheme, frame: Box): 
   })
 }
 
-function drawZoneBadge(
+/**
+ * Full-bleed artwork: the image fills the whole frame and paints underneath
+ * the header and footer overlays, like the web card. The top and bottom
+ * gradients keep the overlaid text readable.
+ */
+function drawArtworkFullBleed(
   ctx: CardRenderContext,
   theme: ZoneTheme,
-  box: Box,
-  font: CardTextFont,
-  label: string,
-  fontSize: number,
-  tracking: number,
-  dotDiameter: number,
-): void {
-  const background = parseColor(theme.badgeBackground)
-  const border = parseColor(theme.primary)
-  const accent = parseColor(theme.accent)
-  const centerY = box.y + box.height / 2
-  const dotRadius = dotDiameter / 2
-  const dotX = box.x + LAYOUT.badgePadX * ctx.width + dotRadius
-
-  drawLocalRoundedRect(ctx, box, box.height / 2, {
-    color: background.color,
-    opacity: background.opacity,
-    borderColor: border.color,
-    borderOpacity: border.opacity * 0.55,
-    borderWidth: Math.max(0.4, 0.0025 * ctx.width),
-  })
-
-  ctx.page.drawEllipse({
-    x: ctx.left + dotX,
-    y: ctx.top - centerY,
-    xScale: dotRadius * 2.2,
-    yScale: dotRadius * 2.2,
-    color: accent.color,
-    opacity: 0.12,
-  })
-  ctx.page.drawEllipse({
-    x: ctx.left + dotX,
-    y: ctx.top - centerY,
-    xScale: dotRadius,
-    yScale: dotRadius,
-    color: accent.color,
-    opacity: 1,
-  })
-
-  const textX = dotX + dotRadius + LAYOUT.badgeDotGap * ctx.width
-  const baseline = ctx.top - centerY - fontSize * TEXT_CENTER_OFFSET
-  drawTrackedText(ctx, label, textX, baseline, font, fontSize, parseColor(theme.badgeText).color, 1, tracking)
-}
-
-function drawArtworkBox(
-  ctx: CardRenderContext,
-  theme: ZoneTheme,
+  frame: Box,
   image: PDFImage | null,
-  box: Box,
-  radius: number,
   card: Card,
   fonts: EmbeddedFonts,
   labels: CardTextLabels,
-  shade: PDFImage,
+  shades: ArtworkShades,
 ): void {
-  const border = parseColor(theme.panelBorder)
-
-  drawLocalRoundedRect(ctx, box, radius, { color: rgb(0, 0, 0), opacity: 0.42 })
-
-  const pdfBox = toPdfBox(ctx, box)
-  pushRoundedRectClip(ctx.page, pdfBox.x, pdfBox.y, pdfBox.width, pdfBox.height, radius)
+  const radius = LAYOUT.frameRadius * ctx.width
+  const pdfFrame = toPdfBox(ctx, frame)
+  pushRoundedRectClip(ctx.page, pdfFrame.x, pdfFrame.y, pdfFrame.width, pdfFrame.height, radius)
 
   if (image && image.width > 0 && image.height > 0) {
-    drawArtworkImage(ctx, image, box)
-    drawArtworkShade(ctx, box, shade)
+    drawArtworkImage(ctx, image, frame)
   } else {
-    drawArtworkPlaceholder(ctx, theme, box, card, fonts, labels, shade)
+    drawArtworkPlaceholder(ctx, theme, frame, card, fonts, labels)
   }
+  drawArtworkShades(ctx, frame, shades)
 
   popClip(ctx.page)
-
-  drawLocalRoundedRect(ctx, box, radius, {
-    borderColor: border.color,
-    borderOpacity: border.opacity,
-    borderWidth: Math.max(0.4, 0.0025 * ctx.width),
-  })
 }
 
 /**
@@ -1286,22 +1346,32 @@ function drawArtworkImage(ctx: CardRenderContext, image: PDFImage, box: Box): vo
 }
 
 /**
- * 1x256 black gradient with an alpha ramp of 0 -> 0.5, drawn over the bottom
- * of the artwork. A real image keeps the vignette smooth: overlapping
- * semi-transparent rectangles show their seams as horizontal lines.
+ * 1x256 black gradients drawn over the full-bleed artwork so the overlaid
+ * text stays readable. The top ramp goes from 0.55 to transparent, the
+ * bottom ramp from transparent to 0.62, matching the web card glow.
  */
-const ARTWORK_SHADE_PNG =
-  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAEACAYAAAByPhyYAAAAHElEQVQ4y2NgQAaMTAwMDAxMo6xR1ihrlDUCWAAn/AJ6aGWvpwAAAABJRU5ErkJggg=='
+const ARTWORK_SHADE_TOP_PNG =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAEACAYAAAByPhyYAAAAN0lEQVQ4y+3OwQoAEBQF0cP3++dnpyxYIcVu6t6agZIhI3qK0TCnfefHHSfSrgv6ju9YeIbUSAWwJYv+e2lm2QAAAABJRU5ErkJggg=='
 
-/** Bottom vignette of the artwork (52% -> 100% black in the stylesheet). */
-function drawArtworkShade(ctx: CardRenderContext, box: Box, shade: PDFImage): void {
-  const shadeHeight = box.height * 0.48
+const ARTWORK_SHADE_BOTTOM_PNG =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAEACAYAAAByPhyYAAAALElEQVQ4y2NggAJGJgYGBgYmTBZ+LsXq6GbRoHPQqM8HjbrhZ9Ggc9Ag9TkAfx4Cm2kqR2EAAAAASUVORK5CYII='
 
-  ctx.page.drawImage(shade, {
-    x: ctx.left + box.x,
-    y: ctx.top - box.y - box.height,
-    width: box.width,
-    height: shadeHeight,
+/** Top and bottom readability gradients over the full-bleed artwork. */
+function drawArtworkShades(ctx: CardRenderContext, frame: Box, shades: ArtworkShades): void {
+  const topHeight = frame.height * 0.38
+  ctx.page.drawImage(shades.top, {
+    x: ctx.left + frame.x,
+    y: ctx.top - frame.y - topHeight,
+    width: frame.width,
+    height: topHeight,
+  })
+
+  const bottomHeight = frame.height * 0.46
+  ctx.page.drawImage(shades.bottom, {
+    x: ctx.left + frame.x,
+    y: ctx.top - frame.y - frame.height,
+    width: frame.width,
+    height: bottomHeight,
   })
 }
 
@@ -1312,24 +1382,23 @@ function drawArtworkPlaceholder(
   card: Card,
   fonts: EmbeddedFonts,
   labels: CardTextLabels,
-  shade: PDFImage,
 ): void {
   const deep = parseColor(theme.primaryDeep).color
-  const primary = parseColor(theme.primary).color
   const light = parseColor(theme.primaryLight).color
 
-  drawLocalRect(ctx, box, deep, 0.9)
-  drawRadialGlow(
-    ctx,
-    box.x + box.width * 0.3,
-    box.y + box.height * 0.18,
-    box.width * 0.5,
-    box.height * 0.4,
-    primary,
-    4,
-    0.06,
-  )
-  drawArtworkShade(ctx, box, shade)
+  // Vertical gradient from the zone deep colour to black, matching the web
+  // placeholder without visible radial rings.
+  const bottom = rgb(0, 0, 0)
+  const bandHeight = box.height / GRADIENT_BANDS
+  for (let index = 0; index < GRADIENT_BANDS; index += 1) {
+    const t = index / (GRADIENT_BANDS - 1)
+    drawLocalRect(
+      ctx,
+      { x: box.x, y: box.y + index * bandHeight, width: box.width, height: bandHeight + 0.3 },
+      mixColors(deep, bottom, t * 0.9),
+      1,
+    )
+  }
 
   const initialText = normalizeForFont(
     fonts.bold,
@@ -1366,180 +1435,6 @@ function drawArtworkPlaceholder(
     0.4,
     labelTracking,
   )
-}
-
-function drawStats(
-  ctx: CardRenderContext,
-  theme: ZoneTheme,
-  fonts: EmbeddedFonts,
-  statsTop: number,
-  statsHeight: number,
-  panelWidth: number,
-  iconSize: number,
-  bodyHeight: number,
-  labelSize: number,
-  valueSize: number,
-  card: Card,
-  labels: CardTextLabels,
-): void {
-  const statLabels = [
-    normalizeForFont(fonts.bold, labels.attack.toUpperCase()),
-    normalizeForFont(fonts.bold, labels.defense.toUpperCase()),
-  ] as const
-  const values = [formatStat(card.attack), formatStat(card.defense)] as const
-  const panelColor = parseColor(theme.panel)
-  const borderColor = parseColor(theme.panelBorder)
-  const inkMuted = parseColor(theme.inkMuted).color
-  const ink = parseColor(theme.ink).color
-  const accent = parseColor(theme.accent).color
-
-  for (let index = 0; index < statLabels.length; index += 1) {
-    const panelX = CONTENT_INSET * ctx.width + index * (panelWidth + LAYOUT.statsGap * ctx.width)
-    const panel: Box = { x: panelX, y: statsTop, width: panelWidth, height: statsHeight }
-
-    drawLocalRoundedRect(ctx, panel, LAYOUT.statRadius * ctx.width, {
-      color: panelColor.color,
-      opacity: panelColor.opacity,
-      borderColor: borderColor.color,
-      borderOpacity: borderColor.opacity,
-      borderWidth: Math.max(0.4, 0.0025 * ctx.width),
-    })
-
-    const iconBox: Box = {
-      x: panelX + LAYOUT.statPadX * ctx.width,
-      y: statsTop + (statsHeight - iconSize) / 2,
-      width: iconSize,
-      height: iconSize,
-    }
-    drawLocalRoundedRect(ctx, iconBox, LAYOUT.statIconRadius * ctx.width, {
-      color: rgb(0, 0, 0),
-      opacity: 0.34,
-      borderColor: borderColor.color,
-      borderOpacity: borderColor.opacity,
-      borderWidth: Math.max(0.4, 0.0025 * ctx.width),
-    })
-    drawStatIcon(ctx, theme, iconBox, index === 0)
-
-    const bodyX = iconBox.x + iconSize + LAYOUT.statIconGap * ctx.width
-    const bodyTop = statsTop + (statsHeight - bodyHeight) / 2
-
-    const labelBaseline = ctx.top - bodyTop - labelSize * TEXT_ASCENT
-    drawTrackedText(
-      ctx,
-      statLabels[index],
-      bodyX,
-      labelBaseline,
-      fonts.bold,
-      labelSize,
-      inkMuted,
-      1,
-      LAYOUT.statLabelTracking * labelSize,
-    )
-
-    drawLocalText(
-      ctx,
-      values[index],
-      bodyX,
-      bodyTop + labelSize * 1.2,
-      fonts.bold,
-      valueSize,
-      index === 0 ? accent : ink,
-    )
-  }
-}
-
-function drawStatIcon(
-  ctx: CardRenderContext,
-  theme: ZoneTheme,
-  box: Box,
-  attack: boolean,
-): void {
-  const size = Math.min(box.width, box.height) * 0.62
-  const x = ctx.left + box.x + (box.width - size) / 2
-  const y = ctx.top - box.y - (box.height - size) / 2
-  const color = attack
-    ? parseColor(theme.accent).color
-    : parseColor(theme.primaryLight).color
-
-  if (!attack) {
-    const shield =
-      `M ${round(size * 0.5)} ${round(size * 0.08)} L ${round(size * 0.88)} ${round(size * 0.24)} ` +
-      `V ${round(size * 0.52)} C ${round(size * 0.88)} ${round(size * 0.74)} ` +
-      `${round(size * 0.7)} ${round(size * 0.88)} ${round(size * 0.5)} ${round(size * 0.92)} ` +
-      `C ${round(size * 0.3)} ${round(size * 0.88)} ${round(size * 0.12)} ${round(size * 0.74)} ` +
-      `${round(size * 0.12)} ${round(size * 0.52)} V ${round(size * 0.24)} Z`
-    ctx.page.drawSvgPath(shield, { x, y, color })
-    return
-  }
-
-  // Football (soccer ball), matching the web card icon (24 unit viewBox).
-  const scale = size / 24
-  const stroke = Math.max(0.5, 1.8 * scale)
-  const centerX = x + 12 * scale
-  const centerY = y - 12 * scale
-
-  ctx.page.drawEllipse({
-    x: centerX,
-    y: centerY,
-    xScale: 10 * scale,
-    yScale: 10 * scale,
-    borderColor: color,
-    borderWidth: stroke,
-  })
-
-  const pentagon = 'M 12 7.8 L 15.99 10.7 L 14.47 15.4 H 9.53 L 8.01 10.7 Z'
-  const seams =
-    'M 12 2 L 12 7.8 M 21.51 8.91 L 15.99 10.7 M 17.88 20.09 L 14.47 15.4 ' +
-    'M 6.12 20.09 L 9.53 15.4 M 2.49 8.91 L 8.01 10.7'
-
-  ctx.page.drawSvgPath(pentagon, { x, y, scale, borderColor: color, borderWidth: stroke })
-  ctx.page.drawSvgPath(seams, { x, y, scale, borderColor: color, borderWidth: stroke })
-}
-
-function drawAction(
-  ctx: CardRenderContext,
-  theme: ZoneTheme,
-  fonts: EmbeddedFonts,
-  box: Box,
-  padX: number,
-  padY: number,
-  labelSize: number,
-  labelGap: number,
-  action: { lines: string[]; size: number },
-  labels: CardTextLabels,
-): void {
-  const borderColor = parseColor(theme.panelBorder)
-  const accent = parseColor(theme.accent).color
-  const ink = parseColor(theme.ink).color
-
-  drawLocalRoundedRect(ctx, box, LAYOUT.actionRadius * ctx.width, {
-    color: rgb(0, 0, 0),
-    opacity: 0.3,
-    borderColor: borderColor.color,
-    borderOpacity: borderColor.opacity,
-    borderWidth: Math.max(0.4, 0.0025 * ctx.width),
-  })
-
-  const label = normalizeForFont(fonts.bold, labels.action.toUpperCase())
-  const labelBaseline = ctx.top - (box.y + padY) - labelSize * TEXT_ASCENT
-  drawTrackedText(
-    ctx,
-    label,
-    box.x + padX,
-    labelBaseline,
-    fonts.bold,
-    labelSize,
-    accent,
-    1,
-    LAYOUT.actionLabelTracking * labelSize,
-  )
-
-  let lineTop = box.y + padY + labelSize + labelGap
-  const lineHeight = action.size * LAYOUT.actionLineHeight
-  for (const line of action.lines) {
-    drawLocalText(ctx, line, box.x + padX, lineTop, fonts.regular, action.size, ink)
-    lineTop += lineHeight
-  }
 }
 
 function formatStat(value: number): string {

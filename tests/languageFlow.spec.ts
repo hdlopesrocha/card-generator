@@ -21,7 +21,7 @@ const routes = [
 ]
 
 async function settle(): Promise<void> {
-  for (let i = 0; i < 40; i += 1) {
+  for (let i = 0; i < 200; i += 1) {
     await flushPromises()
     await new Promise((resolve) => setTimeout(resolve, 0))
   }
@@ -105,7 +105,7 @@ describe('end-to-end language flow', () => {
       expect(blob).not.toBeNull()
       const text = await pdfText(blob as unknown as Blob)
       expect(text).toContain('Guerreiro')
-      expect(text).toContain('Carregue')
+      expect(text).toContain('CARREGUE')
     } finally {
       URL.createObjectURL = originalCreate
       vi.restoreAllMocks()

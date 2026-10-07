@@ -185,10 +185,22 @@ describe('generateCardPdf', () => {
     await expect(loadPdf(together)).resolves.toBeInstanceOf(PDFDocument)
   })
 
-  it('draws the artwork vignette as one smooth gradient image', async () => {
+  it('draws the artwork shading as smooth gradient images', async () => {
     const document = await loadPdf(await generateCardPdf(makeCard({ image: TINY_PNG_DATA_URL })))
+    const gradients = embeddedImageSizes(document).filter(
+      ([width, height]) => width === 1 && height === 256,
+    )
 
-    expect(embeddedImageSizes(document)).toContainEqual([1, 256])
+    expect(gradients.length).toBeGreaterThanOrEqual(2)
+  })
+
+  it('uppercases the action text like the web card', async () => {
+    const content = readPageContent(
+      await loadPdf(await generateCardPdf(makeCard({ action: 'Deal 2 damage.' }))),
+    )
+
+    expect(content).toContain('DEAL 2 DAMAGE.')
+    expect(content).not.toContain('Deal 2 damage')
   })
 
   it('scales the card text with the font scale option', async () => {
@@ -257,8 +269,8 @@ describe('localized PDF export', () => {
 
     expect(content).toContain('Guerreiro')
     expect(content).not.toContain('Guerreir?')
-    expect(content).toContain('próximo')
-    expect(content).not.toContain('pr?ximo')
+    expect(content).toContain('PRÓXIMO')
+    expect(content).not.toContain('PR?XIMO')
     expect(content).not.toContain('Fire Drake')
   })
 
