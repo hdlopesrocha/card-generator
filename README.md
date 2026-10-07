@@ -47,7 +47,7 @@ The project ships a deploy script that publishes the production build to the `gh
 npm run deploy
 ```
 
-It runs `npm run build:pages`, which builds with the `/card-generator/` base path required by project pages, then copies `index.html` to `404.html` (so client-side routes survive a refresh) and adds `.nojekyll`, and finally pushes `dist/` to the `gh-pages` branch.
+It runs `npm run build:pages`, which builds with the `/card-generator/` base path required by project pages, then verifies with `scripts/guard-no-local-data.mjs` that no card data file ended up in `dist/`, copies `index.html` to `404.html` (so client-side routes survive a refresh), adds `.nojekyll`, and finally pushes `dist/` to the `gh-pages` branch.
 
 One-time setup: in the repository on GitHub, open **Settings -> Pages -> Build and deployment**, choose **Deploy from a branch**, and select the `gh-pages` branch with the `/ (root)` folder. The app is then available at:
 
@@ -66,6 +66,7 @@ npm test
 Runs the Vitest suite once (`vitest run`); `npm run test:watch` runs it in watch mode. Vitest is configured in `vite.config.ts` with the `jsdom` environment and loads `tests/**/*.spec.ts`. Current suites:
 
 - `tests/validation.spec.ts` - card validation rules and `parseStatValue` (required fields, numeric ranges, length limits, translation length limits, zones, image data URLs) plus localized error messages.
+- `tests/privacy.spec.ts` - privacy guardrails: no network/exfiltration primitives or absolute URLs in the source, the only `fetch` is the bundled font loader, and no card data file is tracked in git.
 - `tests/storage.spec.ts` - `IndexedDbCardRepository` create/read/update/delete, bulk writes, transaction rollback and database isolation using `fake-indexeddb`.
 - `tests/backup.spec.ts` - backup serialization/parsing, malformed and incompatible files, card validation, translation round-tripping (legacy backups default to empty translations) and id handling.
 - `tests/image.spec.ts` - extension, MIME type and magic-byte detection, size limits and data URL conversion.
@@ -91,6 +92,9 @@ card-generator/
 ├── sample.csv                  Example CSV with the three demo cards
 ├── vite.config.ts              Vite + Vitest configuration (@ alias, jsdom)
 ├── tsconfig.json               Strict TypeScript configuration
+├── scripts/
+│   ├── create-pages-fallback.mjs  Adds 404.html and .nojekyll to dist for GitHub Pages
+│   └── guard-no-local-data.mjs    Aborts the deploy if card data is found in dist
 ├── src/
 │   ├── main.ts                 Creates the Vue app, installs Pinia and the router
 │   ├── App.vue                 Application shell (header with the language picker, navigation, router outlet)
@@ -165,6 +169,7 @@ card-generator/
     ├── languageSwitching.spec.ts Language picker updates cards without reloading
     ├── localization.spec.ts    Message catalog, translate fallback, language store and demo translations
     ├── pdf.spec.ts             PDF generation, pagination, localization and download tests
+    ├── privacy.spec.ts         No network primitives, no extra fetch, no card data in git
     ├── selectedLanguageEditing.spec.ts Creating cards in a non-English language
     ├── storage.spec.ts         IndexedDB repository tests (fake-indexeddb)
     └── validation.spec.ts      Card validation tests
@@ -182,6 +187,33 @@ Vue components  ->  Pinia stores  ->  services  ->  IndexedDB / PDF
 - Pinia stores (`cardStore`, `languageStore`, `settingsStore`) own the collection, loading/saving/error state, the selected language, settings and CRUD orchestration.
 - Services encapsulate persistence (`services/storage`), images (`services/image`), validation (`services/validation`), backup (`services/backup`), localization (`services/localization`) and PDF rendering (`services/pdf`).
 - **No backend, REST API or database server is used.** All data is created, stored and exported in the browser.
+
+## Privacy: cards never leave the browser
+
+The app has no backend, no analytics and no telemetry. Cards and images are
+created, stored and exported entirely on the user's machine:
+
+- Storage is local: cards and images live in IndexedDB (database
+  `card-generator`), while the selected language and settings live in
+  `localStorage`.
+- Every export (CSV, JSON backup, PDF and image ZIP) is written to disk through
+  a temporary blob URL; nothing is uploaded.
+- The only network request in the application source is the PDF exporter reading
+  a bundled font file from the same origin (`fetch` in
+  `src/services/pdf/cardPdfService.ts`). No card data is ever part of a request.
+
+Three safeguards keep it that way:
+
+- `.gitignore` excludes exported card data (`*.csv` except the bundled
+  `sample.csv`, JSON backups, `.db`/`.sqlite*` files, PDFs and image ZIPs), so
+  downloads cannot be committed to GitHub by accident.
+- `npm run deploy` runs `scripts/guard-no-local-data.mjs` after the build and
+  aborts if any card data file is found in `dist/` before it is published to
+  GitHub Pages.
+- `tests/privacy.spec.ts` fails if the source gains a network or exfiltration
+  primitive (`XMLHttpRequest`, `navigator.sendBeacon`, `WebSocket`,
+  `EventSource` or an absolute `http(s)://` URL), adds another `fetch` call, or
+  if a card data file becomes tracked in git.
 
 ## Local persistence (IndexedDB)
 

@@ -8,7 +8,7 @@
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
     "build:pages": "vue-tsc --noEmit && vite build --base=/card-generator/",
-    "deploy": "npm run build:pages && node scripts/create-pages-fallback.mjs && gh-pages -d dist --dotfiles",
+    "deploy": "npm run build:pages && node scripts/guard-no-local-data.mjs dist && node scripts/create-pages-fallback.mjs && gh-pages -d dist --dotfiles",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",

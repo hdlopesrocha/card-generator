@@ -6,3 +6,24 @@ coverage
 .DS_Store
 .vite
 *.log
+
+# --- Local card data: never commit or publish this ---
+# Cards live only in the browser (IndexedDB/localStorage) or in files the user
+# downloads to disk (CSV / JSON backup / PDF / ZIP). These patterns keep that
+# data out of the git repository and off GitHub. `sample.csv` is the bundled
+# demo template (programmatic dummy cards), so it stays tracked on purpose.
+*.csv
+!sample.csv
+card-generator-backup-*.json
+*-backup-*.json
+*.db
+*.sqlite
+*.sqlite3
+*.db3
+*.mdb
+/data/
+/exports/
+/backups/
+card-images-*.zip
+cards-*.pdf
+*-card.pdf
